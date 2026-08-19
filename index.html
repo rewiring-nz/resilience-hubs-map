@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Community Resilience Hubs Map — Demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet">
+<link rel="stylesheet" href="map.css">
+<style>
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0d1414;
+  }
+  .page {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  h1 {
+    color: #e2f5e8;
+    font-size: 20px;
+    margin-bottom: 4px;
+  }
+  p.note {
+    color: #9fb3ae;
+    font-size: 13px;
+    margin-top: 0;
+  }
+  p.note a {
+    color: #6fcf9e;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Rewiring Aotearoa — Community Resilience Hubs Demo</h1>
+  <p class="note">
+    Live data pulled straight from the published Google Sheet — edit the sheet, refresh this
+    page, and the map updates. See README.md for the sheet setup.
+  </p>
+  <div id="resilience-hubs-map" class="rhm-map"></div>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
+<script src="map.js"></script>
+<script>
+  initResilienceHubsMap({
+    sheetCsvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTEKMCsPBcXZir2R0-nuccbjzJmBlyt_87B37C8MpJBupzIFoQic7SBpr42w0msU9Z9dGnkFqyuSlRD/pub?output=csv"
+  });
+</script>
+</body>
+</html>

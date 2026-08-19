@@ -1,0 +1,447 @@
+/* Community Resilience Hubs Map — styles
+   Marker pin + popup theming. Safe to inline into a Webflow Embed. */
+
+/* Scoped so this doesn't depend on the host page already having a
+   border-box reset. Without it, elements below that combine `width` and
+   `padding` (e.g. .rhm-sidebar__header) get padding ADDED on top of that
+   width instead of included within it, pushing them wider than their own
+   parent. */
+.rhm-layout,
+.rhm-layout *,
+.rhm-layout *::before,
+.rhm-layout *::after {
+  box-sizing: border-box;
+}
+
+/* Sidebar (desktop: left of the map) + map, side by side. map.js builds
+   this wrapper around the plain <div id="resilience-hubs-map"> at init
+   time, so the Webflow embed itself never needs to change. */
+.rhm-layout {
+  display: flex;
+  align-items: stretch;
+  height: 70vh;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.rhm-map {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+
+/* Rounded corners live on the canvas itself, not on .rhm-map — clipping
+   the whole map container would also clip popups whenever they open near
+   an edge, hiding them instead of letting them spill outside the map. */
+.rhm-map .maplibregl-canvas {
+  border-radius: 0 12px 12px 0;
+}
+
+.rhm-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #527570;
+  border-radius: 12px 0 0 12px;
+  overflow: hidden;
+  transition: width 0.25s ease, opacity 0.2s ease;
+}
+
+/* Hidden: fully removed from the layout — the map reclaims the width.
+   Brought back via the standalone "Show hub list" map control
+   (.rhm-show-list), not from anything inside the sidebar itself, since
+   the sidebar has no visible footprint at all while hidden. */
+.rhm-sidebar.is-hidden {
+  width: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rhm-sidebar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rhm-sidebar__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.rhm-sidebar__title:hover {
+  text-decoration: underline;
+}
+
+.rhm-sidebar__close {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.rhm-sidebar__close:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.rhm-sidebar__list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 8px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.rhm-sidebar__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 14px;
+  border: none;
+  background: none;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.rhm-sidebar__item:hover,
+.rhm-sidebar__item:focus {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.rhm-sidebar__item--active {
+  background: rgba(255, 201, 60, 0.16);
+}
+
+.rhm-sidebar__item-name {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rhm-sidebar__item-meta {
+  display: block;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Mobile: the map fills the entire layout (which map.js sizes to match
+   whatever height the element wrapping this embed provides — see the
+   height-detection comment in map.js). The list is an overlay docked to
+   the bottom, growing its own max-height from 0 when shown rather than
+   pushing the map into a smaller area, so the map's size never changes
+   as the list opens/closes and the total never exceeds the layout's own
+   height the way stacking map+list would. */
+@media (max-width: 767px) {
+  .rhm-layout {
+    display: block;
+    position: relative;
+  }
+
+  /* position + z-index gives the map its own stacking context, so
+     MapLibre's own internal z-indexes (popups, controls, the canvas
+     itself) stay contained inside it instead of competing directly
+     with .rhm-sidebar for stacking order as bare siblings — without
+     this, the canvas paints over the sidebar despite the sidebar being
+     position:absolute, since neither had an explicit stacking context
+     to begin with. */
+  .rhm-map {
+    height: 100%;
+    width: 100%;
+    position: relative;
+    z-index: 0;
+  }
+
+  .rhm-map .maplibregl-canvas {
+    border-radius: 12px;
+  }
+
+  .rhm-sidebar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+    /* Overrides the desktop `width: 240px` — with an explicit width,
+       `left`/`right: 0` can't both hold at once (over-constrained), so
+       the box would silently stay at 240px wide instead of stretching
+       full-width. */
+    width: auto;
+    max-height: 60%;
+    border-radius: 14px 14px 12px 12px;
+    box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.35);
+    transition: max-height 0.25s ease, opacity 0.2s ease;
+  }
+
+  /* Collapses to zero height (rather than sliding via transform) so it
+     never renders outside .rhm-layout's own box while hidden — .rhm-map
+     stays overflow:visible (unclipped) so marker popups can still spill
+     past the map's edge, so nothing here can rely on the layout itself
+     clipping an off-screen sidebar. */
+  .rhm-sidebar.is-hidden {
+    max-height: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+/* .rhm-marker is the element MapLibre owns and positions — it must carry
+   NONE of our own CSS, not even `position`. MapLibre's own stylesheet
+   sets `.maplibregl-marker { position: absolute }` on this same element
+   (via a class it adds); a `position` rule of ours on the same selector
+   would win or lose depending on cascade order rather than intent, and
+   if it wins, the marker stops being absolutely positioned, gets treated
+   as a normal in-flow block box that stretches to the map's full width,
+   and MapLibre's `translate(-50%, ...)` centering math — computed
+   against that wrong width — throws the marker far off to one side.
+   All real styling — look, hover scale, cursor, the label — lives on
+   the inner .rhm-marker__inner. */
+.rhm-marker__inner {
+  position: relative;
+  cursor: pointer;
+  line-height: 0;
+}
+
+.rhm-marker__pin {
+  display: block;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
+  transform-origin: 50% 100%;
+  transition: transform 0.15s ease;
+}
+
+.rhm-marker__inner:hover .rhm-marker__pin {
+  transform: scale(1.15);
+}
+
+/* Positioned relative to .rhm-marker__inner. Visibility is toggled by
+   the label-collision logic in map.js; kept as visibility rather than
+   display so getBoundingClientRect() stays accurate while hidden. */
+.rhm-marker__label {
+  position: absolute;
+  top: 14px;
+  left: 32px;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(13, 20, 20, 0.62);
+  padding: 2px 6px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.maplibregl-popup-content {
+  border-radius: 10px;
+  padding: 0;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.rhm-popup {
+  padding: 14px 16px 16px;
+  width: 280px;
+}
+
+.rhm-popup__photo {
+  display: block;
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+  margin: -14px -16px 10px;
+  width: calc(100% + 32px);
+  max-width: none;
+}
+
+.rhm-popup__title {
+  margin: 0 0 6px;
+  font-size: 16px;
+  color: #33484a;
+}
+
+.rhm-popup__description {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #4a5a5c;
+}
+
+.rhm-popup__specs {
+  border-top: 1px solid #e5eae9;
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.rhm-popup__spec-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.rhm-popup__spec-label {
+  color: #7c8b8d;
+  flex-shrink: 0;
+}
+
+.rhm-popup__spec-value {
+  color: #33484a;
+  font-weight: 600;
+  text-align: right;
+}
+
+.rhm-pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.rhm-pill--yes {
+  background: rgba(31, 122, 92, 0.14);
+  color: #1f7a5c;
+}
+
+.rhm-pill--no {
+  background: rgba(122, 31, 31, 0.1);
+  color: #a44242;
+}
+
+.rhm-pill--unknown {
+  background: rgba(124, 139, 141, 0.14);
+  color: #7c8b8d;
+}
+
+.rhm-search {
+  position: relative;
+  margin: 10px 0 0 10px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.rhm-search__input {
+  width: 180px;
+  font-size: 13px;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 4px;
+  background: rgba(13, 20, 20, 0.55);
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  outline: none;
+}
+
+.rhm-search__input::placeholder {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.rhm-search__input:focus {
+  background: rgba(13, 20, 20, 0.75);
+  box-shadow: 0 0 0 2px #1f7a5c;
+}
+
+/* Stacks directly under .rhm-search — both are added as "top-left" map
+   controls in that order, and MapLibre stacks same-corner controls in
+   the order they're added. Only shown while the sidebar is hidden. */
+.rhm-show-list {
+  margin: 8px 0 0 10px;
+}
+
+.rhm-show-list__button {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border: none;
+  border-radius: 4px;
+  background: rgba(13, 20, 20, 0.55);
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+
+.rhm-show-list__button:hover {
+  background: rgba(13, 20, 20, 0.75);
+}
+
+.rhm-search__results {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 220px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.rhm-search__result {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: none;
+  border-bottom: 1px solid #eee;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+.rhm-search__result:last-child {
+  border-bottom: none;
+}
+
+.rhm-search__result:hover,
+.rhm-search__result:focus {
+  background: #f4faf7;
+}
+
+.rhm-search__result-name {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #33484a;
+}
+
+/* Shown in place of the map briefly if the sheet fails to load (bad
+   network, sheet un-published, etc.) or loads with no usable rows. */
+.rhm-status {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 260px;
+  text-align: center;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: rgba(13, 20, 20, 0.75);
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+}
