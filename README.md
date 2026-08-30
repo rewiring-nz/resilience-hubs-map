@@ -40,35 +40,45 @@ appear even on a fresh load.
 
 ### 1. Columns
 
-The map expects these column headers (exact spelling, case-sensitive),
-in any order, any sheet/tab name:
+Only three column headers are fixed (exact spelling, case-sensitive);
+everything else is entirely up to you:
 
 | Column | Required | Notes |
 |---|---|---|
 | `Name` | Yes | Hub name — popup title, marker label, list entry |
 | `Lat` | Yes | Decimal latitude. Rows without a valid Lat/Lng are skipped entirely |
 | `Lng` | Yes | Decimal longitude |
-| `Description` | No | Short paragraph shown under the title |
 | `Image1` | No | A direct image URL — shown as a photo at the top of the popup. **Must be a direct image link** (ends in `.jpg`/`.png`/etc. and loads on its own in a browser tab) — a Google Drive "share" link won't work as-is, since that opens Drive's viewer page, not the image file. Host photos somewhere that gives a direct URL (e.g. your Webflow Assets, Imgur, or a Drive link converted to its direct-download form) |
 | `Image2` | No | A second photo URL. Not currently shown in the popup — reserved for a gallery if you want one added later |
-| `Solar` | No | `Yes` / `No` / `Unknown` — shown as a colored pill |
-| `Battery` | No | `Yes` / `No` / `Unknown` |
-| `Generator` | No | `Yes` / `No` / `Unknown` |
-| `V2G` | No | `Yes` / `No` / `Unknown` — vehicle-to-grid capability |
-| `Backup circuits` | No | Free text, e.g. "Lights, outlets" — commas inside this field are fine, the map parses quoted CSV fields correctly |
-| `Generator tank size` | No | Free text, e.g. "20L" |
-| `Space heating type` | No | Free text, e.g. "Heat pump" |
-| `Water heating type` | No | Free text, e.g. "Electric hot water cylinder" |
-| `Square meters` | No | A number — the popup appends "m²" automatically if it parses as one, otherwise shows the text as-is (so "Unknown" still displays cleanly) |
 
-Any other columns in the sheet are ignored, so it's safe to add extra
-working columns (notes, status, whoever's responsible for a row) without
-breaking the map.
+**Every other column in the sheet shows up in the popup automatically**
+— one line per column, in the same left-to-right order as the sheet,
+skipping any that are blank for that row. There's nothing to configure:
+add a column, rename one, reorder them, delete one you don't need
+anymore — the popup just follows. This is how the current sheet's
+`Description`, `Address primary`, `Email`, `Facebook`, `WhatsApp`,
+`Website`, `Radio`, `Brochure`, `Resilience Guide`, `Generator`,
+`Solar`, `Battery`, `V2G`, `Backup circuits`, `Generator tank size`,
+`Space heating type`, and `Water heating type` columns all ended up in
+the popup without any code changes.
 
-`Yes`/`No`/`Unknown` matching is case-insensitive, but stick to those
-exact words — anything else (blank, "TBC", "Maybe") just displays as
-plain text instead of a colored pill, which still works fine, just
-without the color coding.
+Each value gets one of three treatments, decided automatically from
+what's actually in the cell:
+
+- **`Yes` / `No` / `Unknown`** (case-insensitive) → a colored pill
+  (green/red/gray). Anything else just displays as plain text instead —
+  still works fine, just without the color coding.
+- **A `http://` or `https://` URL** → a clickable "Open ↗" link. Good
+  for `Website`, `Facebook`, `Brochure`, or any link column — the
+  column's own label already says what it links to, so the link text
+  stays short rather than showing the whole URL.
+- **An email address** → a clickable `mailto:` link, shown as the
+  address itself.
+- **Anything else** (an address, a name, "Lights, outlets", "20L") →
+  plain text.
+
+Commas inside a cell (e.g. "Lights, outlets") are fine — the map parses
+quoted CSV fields correctly rather than splitting on every comma.
 
 ### 2. Publish the sheet to the web
 
@@ -112,13 +122,13 @@ each tab gets its own CSV URL under this publishing flow.
 ## Popup design notes
 
 - The photo (`Image1`) is only shown if present — hubs without a photo
-  just show title → description → specs, no empty space left for it.
-- Spec rows only appear for columns that have a value in that row — an
-  all-blank row just shows the title/description with no specs section
-  at all, rather than nine empty rows.
-- `Yes`/`No`/`Unknown` become colored pills (green/red/gray); everything
-  else (backup circuits, heating types, tank size, floor area) shows as
-  plain text, right-aligned next to its label.
+  just show the title straight into the field list, no empty space left
+  for it.
+- A hub with most columns filled in can easily have 15+ rows, so the
+  field list scrolls internally (capped around 260px tall) instead of
+  growing the popup taller than the map itself.
+- See the column table above for how each value's treatment (pill,
+  link, or plain text) is decided.
 
 ## Sidebar list, search, mobile behavior
 

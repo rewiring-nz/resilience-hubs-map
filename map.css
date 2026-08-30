@@ -258,7 +258,7 @@
 
 .rhm-popup {
   padding: 14px 16px 16px;
-  width: 280px;
+  width: 300px;
 }
 
 .rhm-popup__photo {
@@ -277,38 +277,49 @@
   color: #33484a;
 }
 
-.rhm-popup__description {
-  margin: 0 0 10px;
-  font-size: 13px;
-  line-height: 1.4;
-  color: #4a5a5c;
-}
-
+/* Scrolls internally rather than growing the popup to fit every column
+   in the sheet — a hub with most columns filled in can easily have 15+
+   rows, taller than the map itself on a small screen. */
 .rhm-popup__specs {
   border-top: 1px solid #e5eae9;
   padding-top: 8px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
 }
 
 .rhm-popup__spec-row {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 12px;
+  gap: 10px;
+  font-size: 11px;
 }
 
 .rhm-popup__spec-label {
   color: #7c8b8d;
-  flex-shrink: 0;
+  flex: 0 0 96px;
 }
 
 .rhm-popup__spec-value {
   color: #33484a;
   font-weight: 600;
-  text-align: right;
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.rhm-popup__spec-link {
+  color: #1f7a5c;
+  font-weight: 600;
+  text-decoration: none;
+  flex: 1;
+  min-width: 0;
+}
+
+.rhm-popup__spec-link:hover {
+  text-decoration: underline;
 }
 
 .rhm-pill {

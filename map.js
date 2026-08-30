@@ -90,6 +90,15 @@
     });
   }
 
+  // Columns handled specially elsewhere in the popup (title, marker
+  // position, header photo) rather than as a generic field row — every
+  // other column in the sheet, whatever it's called, shows up in the
+  // popup automatically. This is what lets you add/rename/remove a
+  // column in the sheet without ever touching this file: popupHTML()
+  // below just iterates whatever's left in `fields`, in the sheet's own
+  // column order.
+  var SPECIAL_FIELDS = { Name: true, Lat: true, Lng: true, Image1: true, Image2: true };
+
   function rowsToFeatureCollection(rowObjects) {
     var features = [];
     rowObjects.forEach(function (o) {
@@ -97,23 +106,19 @@
       var lng = parseFloat(o.Lng);
       if (Number.isNaN(lat) || Number.isNaN(lng)) return;
 
+      var fields = {};
+      Object.keys(o).forEach(function (key) {
+        if (!SPECIAL_FIELDS[key]) fields[key] = o[key];
+      });
+
       features.push({
         type: "Feature",
         geometry: { type: "Point", coordinates: [lng, lat] },
         properties: {
           name: o.Name || "Resilience Hub",
-          description: o.Description || "",
           image1: o.Image1 || "",
           image2: o.Image2 || "",
-          solar: o.Solar || "",
-          battery: o.Battery || "",
-          generator: o.Generator || "",
-          v2g: o.V2G || "",
-          backupCircuits: o["Backup circuits"] || "",
-          generatorTankSize: o["Generator tank size"] || "",
-          spaceHeatingType: o["Space heating type"] || "",
-          waterHeatingType: o["Water heating type"] || "",
-          squareMeters: o["Square meters"] || ""
+          fields: fields
         }
       });
     });
@@ -142,17 +147,46 @@
 
   // ---- Popup content ----------------------------------------------------
 
-  function specRow(label, value) {
-    var v = (value || "").trim();
+  var EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  // A column's value becomes a clickable link automatically if it looks
+  // like one — no per-column configuration needed, so a "Website" or
+  // "Brochure" column (or any future column with a URL/email in it)
+  // just works. Link text stays short ("Open ↗") since the column
+  // LABEL already says what it links to; a raw URL would often be
+  // longer than the whole popup is wide.
+  function linkifyValue(v) {
+    if (/^https?:\/\//i.test(v)) {
+      return (
+        '<a class="rhm-popup__spec-link" href="' + escapeHTML(v) +
+        '" target="_blank" rel="noopener noreferrer">Open ↗</a>'
+      );
+    }
+    if (EMAIL_PATTERN.test(v)) {
+      return '<a class="rhm-popup__spec-link" href="mailto:' + escapeHTML(v) + '">' + escapeHTML(v) + "</a>";
+    }
+    return null;
+  }
+
+  // One row per non-empty column. Yes/No/Unknown values become a
+  // colored pill (as before); a URL or email becomes a clickable link;
+  // everything else is shown as plain text.
+  function specRow(label, rawValue) {
+    var v = (rawValue || "").trim();
     if (!v) return "";
     var lower = v.toLowerCase();
     var pillClass =
       lower === "yes" ? " rhm-pill--yes" :
       lower === "no" ? " rhm-pill--no" :
       lower === "unknown" ? " rhm-pill--unknown" : "";
-    var valueHTML = pillClass
-      ? '<span class="rhm-pill' + pillClass + '">' + escapeHTML(v) + "</span>"
-      : '<span class="rhm-popup__spec-value">' + escapeHTML(v) + "</span>";
+
+    var valueHTML;
+    if (pillClass) {
+      valueHTML = '<span class="rhm-pill' + pillClass + '">' + escapeHTML(v) + "</span>";
+    } else {
+      valueHTML = linkifyValue(v) || ('<span class="rhm-popup__spec-value">' + escapeHTML(v) + "</span>");
+    }
+
     return (
       '<div class="rhm-popup__spec-row">' +
       '<span class="rhm-popup__spec-label">' + escapeHTML(label) + "</span>" +
@@ -161,37 +195,20 @@
     );
   }
 
-  function floorAreaDisplay(value) {
-    var v = (value || "").trim();
-    if (!v) return "";
-    var n = parseFloat(v);
-    return Number.isNaN(n) ? v : n + " m²";
-  }
-
   function popupHTML(props) {
     var photo = props.image1
       ? '<img class="rhm-popup__photo" src="' + escapeHTML(props.image1) + '" alt="">'
       : "";
-    var description = props.description
-      ? '<p class="rhm-popup__description">' + escapeHTML(props.description) + "</p>"
-      : "";
 
-    var specs =
-      specRow("Solar", props.solar) +
-      specRow("Battery", props.battery) +
-      specRow("Generator", props.generator) +
-      specRow("V2G", props.v2g) +
-      specRow("Backup circuits", props.backupCircuits) +
-      specRow("Generator tank size", props.generatorTankSize) +
-      specRow("Space heating", props.spaceHeatingType) +
-      specRow("Water heating", props.waterHeatingType) +
-      specRow("Floor area", floorAreaDisplay(props.squareMeters));
+    var specs = "";
+    Object.keys(props.fields).forEach(function (key) {
+      specs += specRow(key, props.fields[key]);
+    });
 
     return (
       '<div class="rhm-popup">' +
       photo +
       '<h3 class="rhm-popup__title">' + escapeHTML(props.name) + "</h3>" +
-      description +
       (specs ? '<div class="rhm-popup__specs">' + specs + "</div>" : "") +
       "</div>"
     );
@@ -614,7 +631,7 @@
       // around; the popup content is still reachable by tabbing to it.
       var popup = new maplibregl.Popup({
         offset: 18,
-        maxWidth: "300px",
+        maxWidth: "320px",
         focusAfterOpen: false
       }).setHTML(popupHTML(feature.properties));
       popup.on("open", function () {
