@@ -475,8 +475,15 @@
      map.css. See README.md for how the sheet needs to be set up. */
   
   (function () {
-    var NZ_CENTER = [172.8, -41.3];
-  
+    // Centered on Queenstown Lakes district — where every hub in the
+    // sheet currently is — so the map opens already zoomed in there
+    // instead of flashing the whole country before fitToHubs() (which
+    // runs once the sheet data has loaded) narrows it down. If hubs
+    // outside this district get added later, fitToHubs() still adjusts
+    // to fit all of them; this only sets the very first paint.
+    var INITIAL_CENTER = [168.75, -44.85];
+    var INITIAL_ZOOM = 9;
+
     // ---- Google Sheet CSV loading + parsing ------------------------------
     // The sheet is fetched fresh on every page load (not real-time push),
     // so edits made by anyone with edit access to the sheet show up the
@@ -1012,8 +1019,8 @@
             { id: "labels", type: "raster", source: "labels", paint: { "raster-opacity": 0.9 } }
           ]
         },
-        center: NZ_CENTER,
-        zoom: 4.8,
+        center: INITIAL_CENTER,
+        zoom: INITIAL_ZOOM,
         minZoom: 3,
         maxZoom: 18,
         // Scrolling the page past the map won't zoom it — scroll-zoom only
