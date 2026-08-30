@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Community Resilience Hubs Map</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet">
+<link rel="stylesheet" href="map.css">
+<style>
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+  /* Fills the iframe's own viewport exactly, instead of map.css's
+     default 70vh (meant for an inline embed sitting in a longer page).
+     An iframe's height is already controlled by the <iframe> element on
+     the host page, so this should just fill all of it. */
+  .rhm-layout {
+    height: 100vh;
+  }
+</style>
+</head>
+<body>
+<div id="resilience-hubs-map" class="rhm-map"></div>
+
+<script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
+<script src="map.js"></script>
+<script>
+  initResilienceHubsMap({
+    sheetCsvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTEKMCsPBcXZir2R0-nuccbjzJmBlyt_87B37C8MpJBupzIFoQic7SBpr42w0msU9Z9dGnkFqyuSlRD/pub?output=csv"
+  });
+</script>
+</body>
+</html>
