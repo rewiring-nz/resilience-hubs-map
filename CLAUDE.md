@@ -138,6 +138,24 @@ this scale, not fine if this dataset ever grows to cover terrain where
 straight-line and driving distance diverge a lot (e.g. across a harbor
 or mountain range with one road around it).
 
+**If a user reports "Find closest hub" always fails with "Location
+permission denied," check the embed method before assuming it's a code
+bug.** Browsers block `navigator.geolocation` inside a cross-origin
+iframe by default — `embed.html` (Option A in README) only gets
+permission if the *host page's* `<iframe>` tag has
+`allow="geolocation"`. Without it, `getCurrentPosition`'s error
+callback fires immediately with `PERMISSION_DENIED`, and — this is the
+easy-to-miss part — **the browser's actual permission prompt never
+appears at all**, so it looks exactly like the visitor clicked "deny"
+even though they were never asked. There is no way to distinguish this
+case from a real user denial in JS (`err.code` is `PERMISSION_DENIED`
+either way) — the fix is entirely on the embedding side (add the `allow`
+attribute to the iframe, not a page-content-level check-and-adjust done
+inside this codebase), so don't go looking for a code-side detection of
+"blocked by iframe policy" — it doesn't exist and isn't buildable.
+Option B (inline paste) doesn't have this problem at all, since there's
+no iframe boundary for the permission to cross.
+
 ## Data source
 
 Published Google Sheet, fetched as CSV — see README.md's "Setting up

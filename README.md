@@ -183,6 +183,7 @@ Two ways to add this map to a page — pick one:
   src="https://rewiring-nz.github.io/resilience-hubs-map/embed.html"
   style="width: 100%; height: 70vh; border: 0; border-radius: 12px;"
   loading="lazy"
+  allow="geolocation"
   title="Community Resilience Hubs Map">
 </iframe>
 ```
@@ -191,6 +192,14 @@ Two ways to add this map to a page — pick one:
    above into it (adjust the `height` in the `style` attribute to
    whatever you want).
 2. Publish the page.
+
+**The `allow="geolocation"` attribute is required**, not optional, for
+the "Find closest hub" button to work — browsers block geolocation
+inside a cross-origin iframe by default unless the parent page's
+`<iframe>` tag explicitly grants it. Without this attribute, clicking
+that button fails immediately with "Location permission denied" and
+the visitor never even sees the browser's actual permission prompt —
+easy to mistake for the visitor having denied it themselves.
 
 Why this is the default recommendation: it points at the live,
 GitHub-hosted `embed.html`, so **any future update to this map** (bug
