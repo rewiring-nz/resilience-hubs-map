@@ -177,15 +177,34 @@ each tab gets its own CSV URL under this publishing flow.
   Clicking it asks the browser for the visitor's current location (the
   usual browser permission prompt), then flies to and selects whichever
   hub is nearest — straight-line distance, not driving distance. Button
-  text becomes "Locating…" while waiting, and briefly shows "Location
-  permission denied" or "Location unavailable" if the visitor declines
-  or it can't get a fix, before reverting back after a few seconds.
-  This button doesn't render at all if the browser has no Geolocation
-  API (very old browsers, or loading the page over plain `http://` on
-  anything other than `localhost` — geolocation requires a secure
-  context). **If embedding via iframe (Option A below), the iframe tag
-  needs `allow="geolocation"` or this always fails** — see that
-  section.
+  text becomes "Locating…" while waiting, then briefly shows what went
+  wrong if it can't answer, before reverting after a few seconds:
+  "Location permission denied" (the visitor declined the prompt),
+  "Location blocked on this page" (see below), "Location timed out", or
+  "Location unavailable". This button doesn't render at all if the
+  browser has no Geolocation API (very old browsers, or loading the
+  page over plain `http://` on anything other than `localhost` —
+  geolocation requires a secure context), or if the page it's embedded
+  on has blocked geolocation outright.
+
+  **"Location blocked on this page"** — or, on an older copy of this
+  map, "Location permission denied" without any permission prompt ever
+  appearing — means the map is in an `<iframe>` that hasn't been
+  allowed to use geolocation. Fix it by adding `allow="geolocation"` to
+  the `<iframe>` tag on the host page (it's in the snippet below); see
+  Option A. The browser console carries the same explanation.
+
+  **"Location unavailable" or "Location timed out"** is the opposite
+  case: the page is allowed to ask and the visitor didn't refuse, but
+  the device couldn't produce a position. That's device-side, not
+  something this repo can fix — most often location services turned off
+  for the browser at the OS level (macOS System Settings → Privacy &
+  Security → Location Services; iOS Settings → Privacy & Safety →
+  Location Services), a desktop with no GPS and no usable wifi
+  positioning, or a VPN/privacy extension blocking the browser's
+  location lookup. The map retries once with GPS-grade accuracy before
+  giving up, and logs the browser's own error code and message to the
+  console, which is the quickest way to tell these apart.
 
 ## Embedding on Webflow
 
@@ -211,10 +230,13 @@ Two ways to add this map to a page — pick one:
 **The `allow="geolocation"` attribute is required**, not optional, for
 the "Find closest hub" button to work — browsers block geolocation
 inside a cross-origin iframe by default unless the parent page's
-`<iframe>` tag explicitly grants it. Without this attribute, clicking
-that button fails immediately with "Location permission denied" and
-the visitor never even sees the browser's actual permission prompt —
-easy to mistake for the visitor having denied it themselves.
+`<iframe>` tag explicitly grants it. Without this attribute the button
+hides itself where the browser admits the block up front (Chromium),
+and elsewhere fails immediately with the visitor never even seeing the
+browser's actual permission prompt — easy to mistake for the visitor
+having denied it themselves. Adding the attribute doesn't grant
+anything by itself: the visitor still gets, and can still decline, the
+normal browser prompt.
 
 Why this is the default recommendation: it points at the live,
 GitHub-hosted `embed.html`, so **any future update to this map** (bug
