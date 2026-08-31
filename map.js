@@ -388,6 +388,95 @@
     };
   }
 
+  // ---- "Find closest hub" control ---------------------------------------
+
+  function toRadians(deg) {
+    return (deg * Math.PI) / 180;
+  }
+
+  // Great-circle distance in km. Plenty accurate for comparing hubs
+  // within one region — no need for anything more precise than
+  // treating the Earth as a sphere at this scale.
+  function haversineKm(lat1, lng1, lat2, lng2) {
+    var R = 6371;
+    var dLat = toRadians(lat2 - lat1);
+    var dLng = toRadians(lng2 - lng1);
+    var a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  function closestEntry(entries, lat, lng) {
+    var best = null;
+    var bestDist = Infinity;
+    entries.forEach(function (entry) {
+      var coords = entry.feature.geometry.coordinates; // [lng, lat]
+      var d = haversineKm(lat, lng, coords[1], coords[0]);
+      if (d < bestDist) {
+        bestDist = d;
+        best = entry;
+      }
+    });
+    return best;
+  }
+
+  // Stacks directly under the search box (added right after it, same
+  // "top-left" corner). Only rendered at all if the browser actually
+  // supports geolocation (see the call site) — no point offering a
+  // button that can only ever fail.
+  function createFindClosestControl(map, entries) {
+    var container = document.createElement("div");
+    container.className = "maplibregl-ctrl rhm-find-closest";
+
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "rhm-find-closest__button";
+    var defaultLabel = "Find closest hub";
+    button.textContent = defaultLabel;
+
+    button.addEventListener("click", function () {
+      if (!entries.length) return;
+      button.disabled = true;
+      button.textContent = "Locating…";
+
+      navigator.geolocation.getCurrentPosition(
+        function (pos) {
+          button.disabled = false;
+          button.textContent = defaultLabel;
+          var closest = closestEntry(entries, pos.coords.latitude, pos.coords.longitude);
+          if (closest) focusEntry(map, closest, false);
+        },
+        function (err) {
+          button.disabled = false;
+          button.textContent = err.code === err.PERMISSION_DENIED ? "Location permission denied" : "Location unavailable";
+          setTimeout(function () {
+            button.textContent = defaultLabel;
+          }, 3000);
+        },
+        // High accuracy (GPS lock) isn't needed just to tell which hub
+        // is nearest — hubs are km apart — and skipping it means a
+        // faster (network/wifi-based) response instead of waiting on
+        // GPS. maximumAge lets a second click reuse a recent fix
+        // instead of re-prompting the device hardware every time.
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+      );
+    });
+
+    container.appendChild(button);
+
+    return {
+      onAdd: function () {
+        return container;
+      },
+      onRemove: function () {
+        if (container.parentNode) container.parentNode.removeChild(container);
+      }
+    };
+  }
+
   // ---- Sidebar list -----------------------------------------------------
   // Wraps the map container in a layout with a collapsible list beside it
   // (overlaid on top of it on mobile, via CSS — see map.css). Restructures
@@ -684,8 +773,16 @@
     watchLabelCollisions(map, entries);
     map.addControl(createSearchControl(map, entries), "top-left");
 
-    // Added after the search control so it stacks directly below it in
-    // the top-left corner. Only shown while the sidebar is hidden.
+    // Added right after the search control so it stacks directly below
+    // it. Skipped entirely if the browser has no Geolocation API at
+    // all (very old browsers, or a non-secure/non-localhost origin) —
+    // no point offering a button that can only ever fail.
+    if (navigator.geolocation) {
+      map.addControl(createFindClosestControl(map, entries), "top-left");
+    }
+
+    // Added after those so it stacks below them in the top-left corner.
+    // Only shown while the sidebar is hidden.
     var showListControl = createShowListControl(function () {
       setSidebarVisible(true);
     });

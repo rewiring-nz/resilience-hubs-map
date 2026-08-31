@@ -376,7 +376,37 @@
 
 /* Stacks directly under .rhm-search — both are added as "top-left" map
    controls in that order, and MapLibre stacks same-corner controls in
-   the order they're added. Only shown while the sidebar is hidden. */
+   the order they're added. Always shown (unlike .rhm-show-list below,
+   which only shows while the sidebar is hidden) — finding the nearest
+   hub is useful regardless of whether the list happens to be open. */
+.rhm-find-closest {
+  margin: 8px 0 0 10px;
+}
+
+.rhm-find-closest__button {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border: none;
+  border-radius: 4px;
+  background: rgba(13, 20, 20, 0.55);
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+
+.rhm-find-closest__button:hover {
+  background: rgba(13, 20, 20, 0.75);
+}
+
+.rhm-find-closest__button:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+/* Stacks below .rhm-find-closest (added after it, same corner). Only
+   shown while the sidebar is hidden. */
 .rhm-show-list {
   margin: 8px 0 0 10px;
 }

@@ -125,6 +125,19 @@ opens before the camera finishes moving), this can jank-scroll the
 whole host page. Same root cause and fix as the sibling communities-map
 repo.
 
+**"Find closest hub" (`createFindClosestControl`) is only added to the
+map at all if `navigator.geolocation` exists** (checked at the call
+site in `renderHubs()`, not inside the function) — no point rendering a
+button that can only ever fail. It uses `enableHighAccuracy: false`
+deliberately: hubs in this dataset are km apart, so network/wifi-based
+location is both good enough and meaningfully faster than waiting on a
+GPS lock. `maximumAge: 300000` lets a second click within 5 minutes
+reuse the cached fix instead of re-prompting the device hardware.
+Distance is straight-line (haversine), not driving distance — fine at
+this scale, not fine if this dataset ever grows to cover terrain where
+straight-line and driving distance diverge a lot (e.g. across a harbor
+or mountain range with one road around it).
+
 ## Data source
 
 Published Google Sheet, fetched as CSV — see README.md's "Setting up

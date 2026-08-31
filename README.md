@@ -160,6 +160,17 @@ Same interaction pattern as the Communities Map:
 - Search matches on hub name (diacritic-insensitive).
 - Only one popup is ever open at a time; the list highlights whichever
   hub's popup is currently open, however it was opened.
+- A **"Find closest hub"** button sits directly under the search box.
+  Clicking it asks the browser for the visitor's current location (the
+  usual browser permission prompt), then flies to and opens the popup
+  for whichever hub is nearest — straight-line distance, not driving
+  distance. Button text becomes "Locating…" while waiting, and briefly
+  shows "Location permission denied" or "Location unavailable" if the
+  visitor declines or it can't get a fix, before reverting back after a
+  few seconds. This button doesn't render at all if the browser has no
+  Geolocation API (very old browsers, or loading the page over plain
+  `http://` on anything other than `localhost` — geolocation requires a
+  secure context).
 
 ## Embedding on Webflow
 
