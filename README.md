@@ -1,18 +1,23 @@
 # Community Resilience Hubs Map
 
 A satellite-style MapLibre map of community resilience hubs across New
-Zealand, paired with a collapsible list of every hub (left of the map on
-desktop, overlaid on top of it on mobile). Clicking a marker or a list
-entry opens a popup with the hub's name, photo, and every other column
-from that row of the sheet (address, contact links, resilience specs —
-whatever's in the sheet, see [Columns](#1-columns) below). No API keys,
-no CMS — the data comes straight from a published Google Sheet, and the
-basemap uses free Esri World Imagery tiles.
+Zealand, paired with a slide-out panel (right of the map on desktop,
+bottom of the screen on mobile) that shows either the full hub list or
+one selected hub's detail view — never both at once. Clicking a marker
+or a list entry swaps the panel to that hub's detail: name, photo, and
+every other column from that row of the sheet (address, contact links,
+resilience specs — whatever's in the sheet, see [Columns](#1-columns)
+below). A "← All hubs" link (or the panel's own title) swaps back to
+the list. No API keys, no CMS — the data comes straight from a
+published Google Sheet, and the basemap uses free Esri World Imagery
+tiles.
 
-This is the same visual style and interaction pattern as the
+This started from the same visual style and interaction pattern as the
 [Communities Map](https://github.com/rewiring-nz/communities-map) —
 sidebar list, search, mobile overlay behavior, cooperative scroll-zoom —
-just with a different data source and popup content.
+though the panel itself (right-side placement, the list/detail swap)
+has since diverged from that shared starting point to fit this map's
+richer per-hub data.
 
 ## Why a Google Sheet instead of a CMS collection
 
@@ -55,22 +60,22 @@ everything else is entirely up to you:
 
 | Column | Required | Notes |
 |---|---|---|
-| `Name` | Yes | Hub name — popup title, marker label, list entry |
+| `Name` | Yes | Hub name — detail view title, marker label, list entry |
 | `Lat` | Yes | Decimal latitude. Rows without a valid Lat/Lng are skipped entirely |
 | `Lng` | Yes | Decimal longitude |
-| `Image1` | No | A direct image URL — shown as a photo at the top of the popup. **Must be a direct image link** (ends in `.jpg`/`.png`/etc. and loads on its own in a browser tab) — a Google Drive "share" link won't work as-is, since that opens Drive's viewer page, not the image file. Host photos somewhere that gives a direct URL (e.g. your Webflow Assets, Imgur, or a Drive link converted to its direct-download form) |
-| `Image2` | No | A second photo URL. Not currently shown in the popup — reserved for a gallery if you want one added later |
+| `Image1` | No | A direct image URL — shown as a photo at the top of the detail view. **Must be a direct image link** (ends in `.jpg`/`.png`/etc. and loads on its own in a browser tab) — a Google Drive "share" link won't work as-is, since that opens Drive's viewer page, not the image file. Host photos somewhere that gives a direct URL (e.g. your Webflow Assets, Imgur, or a Drive link converted to its direct-download form) |
+| `Image2` | No | A second photo URL. Not currently shown in the detail view — reserved for a gallery if you want one added later |
 
-**Every other column in the sheet shows up in the popup automatically**
-— one line per column, in the same left-to-right order as the sheet,
-skipping any that are blank for that row. There's nothing to configure:
-add a column, rename one, reorder them, delete one you don't need
-anymore — the popup just follows. This is how the current sheet's
-`Description`, `Address primary`, `Email`, `Facebook`, `WhatsApp`,
-`Website`, `Radio`, `Brochure`, `Resilience Guide`, `Generator`,
-`Solar`, `Battery`, `V2G`, `Backup circuits`, `Generator tank size`,
-`Space heating type`, and `Water heating type` columns all ended up in
-the popup without any code changes.
+**Every other column in the sheet shows up in the detail view
+automatically** — one line per column, in the same left-to-right order
+as the sheet, skipping any that are blank for that row. There's nothing
+to configure: add a column, rename one, reorder them, delete one you
+don't need anymore — the detail view just follows. This is how the
+current sheet's `Description`, `Address primary`, `Email`, `Facebook`,
+`WhatsApp`, `Website`, `Radio`, `Brochure`, `Resilience Guide`,
+`Generator`, `Solar`, `Battery`, `V2G`, `Backup circuits`, `Generator
+tank size`, `Space heating type`, and `Water heating type` columns all
+ended up there without any code changes.
 
 Each value gets one of three treatments, decided automatically from
 what's actually in the cell:
@@ -129,48 +134,58 @@ that exact tab. If you need the map to read a *different* tab than the
 one that URL defaults to, republish selecting that tab specifically —
 each tab gets its own CSV URL under this publishing flow.
 
-## Popup design notes
+## Detail view design notes
 
 - The photo (`Image1`) is only shown if present — hubs without a photo
   just show the title straight into the field list, no empty space left
   for it.
-- The card is 340px wide. A hub with most columns filled in can easily
-  have 15+ rows, so the field list scrolls internally (capped around
-  360px tall) instead of growing the popup taller than the map itself.
+- The panel is 340px wide. A hub with most columns filled in can easily
+  have 15+ rows — the *whole panel* scrolls as one unit to fit them
+  (not a separate inner scroll just for the field list), so there's
+  never a scroll-within-a-scroll.
 - See the column table above for how each value's treatment (pill,
-  link, or plain text) is decided.
+  link, or plain text) is decided. Pills use solid fills (not the
+  pale-tint style you'd see on a white background) since they sit on
+  the panel's own green background.
 
-## Sidebar list, search, mobile behavior
+## Sidebar panel, search, mobile behavior
 
-Same interaction pattern as the Communities Map:
-
-- Desktop (`≥768px`): list on the left, map on the right.
-- Mobile (`<768px`): the map fills the whole embed height, and the list
-  is an overlay that grows up from the bottom edge when shown, rather
-  than pushing the map into a smaller area. The map's own height on
-  mobile is auto-detected from the nearest ancestor element with an
+- Desktop (`≥768px`): map on the left, panel on the right.
+- Mobile (`<768px`): the map fills the whole embed height, and the
+  panel is an overlay that grows up from the bottom edge when shown,
+  rather than pushing the map into a smaller area. The map's own height
+  on mobile is auto-detected from the nearest ancestor element with an
   explicit `max-height` (e.g. if you wrap the embed in a div with
   `max-height: 70vh; overflow: hidden`) — nothing to configure, it just
   works if you've set that up, and falls back to a `70vh` default
   otherwise.
-- The **✕** in the list header hides it; a **"Show hub list"** button
-  then appears as a map control to bring it back.
-- Clicking the **"Resilience Hubs"** title re-fits the map to show every
-  hub.
+- **The panel shows either the full hub list or one selected hub's
+  detail view — never both.** Selecting a hub (marker click, list
+  click, search, or "Find closest hub") swaps the panel to that hub's
+  detail; a **"← All hubs"** link at the top of the detail view (pinned
+  there even as the rest of it scrolls) swaps back to the list.
+  Clicking the **"Resilience Hubs"** title does the same *and* re-fits
+  the map to show every hub — it's a "home" control. Only one hub is
+  ever selected at a time; the list highlights whichever one's detail
+  view is currently showing, however it was reached.
+- The **✕** in the panel header hides the whole panel (list or detail,
+  whichever is showing); a **"Show hub list"** button then appears as a
+  map control to bring it back — always to the list view, regardless of
+  what was showing when it was hidden.
 - Search matches on hub name (diacritic-insensitive).
-- Only one popup is ever open at a time; the list highlights whichever
-  hub's popup is currently open, however it was opened.
 - A **"Find closest hub"** button sits directly under the search box.
   Clicking it asks the browser for the visitor's current location (the
-  usual browser permission prompt), then flies to and opens the popup
-  for whichever hub is nearest — straight-line distance, not driving
-  distance. Button text becomes "Locating…" while waiting, and briefly
-  shows "Location permission denied" or "Location unavailable" if the
-  visitor declines or it can't get a fix, before reverting back after a
-  few seconds. This button doesn't render at all if the browser has no
-  Geolocation API (very old browsers, or loading the page over plain
-  `http://` on anything other than `localhost` — geolocation requires a
-  secure context).
+  usual browser permission prompt), then flies to and selects whichever
+  hub is nearest — straight-line distance, not driving distance. Button
+  text becomes "Locating…" while waiting, and briefly shows "Location
+  permission denied" or "Location unavailable" if the visitor declines
+  or it can't get a fix, before reverting back after a few seconds.
+  This button doesn't render at all if the browser has no Geolocation
+  API (very old browsers, or loading the page over plain `http://` on
+  anything other than `localhost` — geolocation requires a secure
+  context). **If embedding via iframe (Option A below), the iframe tag
+  needs `allow="geolocation"` or this always fails** — see that
+  section.
 
 ## Embedding on Webflow
 
@@ -215,7 +230,7 @@ below for why the inline option does need one).
 2. Paste the full contents of `webflow-embed.html` into it.
 3. If you want a fixed map height on mobile, wrap the Embed in a Div
    block and set that div's Max Height (e.g. `70vh`) — optional, falls
-   back to a sensible default without it. See "Sidebar list, search,
+   back to a sensible default without it. See "Sidebar panel, search,
    mobile behavior" above for why this only affects mobile.
 4. Publish the page.
 
@@ -235,8 +250,8 @@ sibling).
 
 - **`sheetCsvUrl`** — point this at your own sheet's published CSV URL
   (see setup above) if you're duplicating this for a different dataset.
-- **Marker color / popup styling** — edit the `<style>` block
-  (`.rhm-marker`, `.rhm-popup*`, `.rhm-pill*` classes) — in `map.css`
+- **Marker / detail view styling** — edit the `<style>` block
+  (`.rhm-marker*`, `.rhm-detail*`, `.rhm-pill*` classes) — in `map.css`
   for `embed.html`/`index.html`, or the inlined `<style>` block for
   `webflow-embed.html`.
 - **Scroll-zoom gesture lock** — off by default (plain scroll-to-zoom).
