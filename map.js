@@ -423,6 +423,43 @@
     return best;
   }
 
+  // A cross-origin <iframe> gets no geolocation at all unless its host
+  // page opts in with allow="geolocation" on the <iframe> tag — and
+  // when it hasn't, the browser never prompts: getCurrentPosition()
+  // fails immediately with PERMISSION_DENIED, which is byte-identical
+  // to the user having clicked "Block". So a map embedded per README
+  // Option A on a page missing that attribute reports a declined
+  // permission the visitor was never actually asked for. Detect it up
+  // front wherever the browser exposes the policy (Chromium's
+  // document.featurePolicy, the newer document.permissionsPolicy) so
+  // the button isn't offered when it can only ever fail.
+  function geolocationBlockedByPolicy() {
+    var policy = document.permissionsPolicy || document.featurePolicy;
+    if (!policy || typeof policy.allowsFeature !== "function") return false;
+    try {
+      return !policy.allowsFeature("geolocation");
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // The same failure recognized after the fact, for the browsers that
+  // expose no policy object to check beforehand (Safari, Firefox).
+  // Each words it differently ("permissions policy", "feature policy",
+  // "disabled in this document"), hence the loose match — but none of
+  // them mentions a policy when a human actually denied the prompt.
+  function isPolicyBlockedError(err) {
+    if (!err || err.code !== err.PERMISSION_DENIED) return false;
+    return /polic|disabled/i.test(String(err.message || ""));
+  }
+
+  function geolocationErrorLabel(err) {
+    if (isPolicyBlockedError(err)) return "Location blocked on this page";
+    if (err && err.code === err.PERMISSION_DENIED) return "Location permission denied";
+    if (err && err.code === err.TIMEOUT) return "Location timed out";
+    return "Location unavailable";
+  }
+
   // Stacks directly under the search box (added right after it, same
   // "top-left" corner). Only rendered at all if the browser actually
   // supports geolocation (see the call site) — no point offering a
@@ -451,7 +488,17 @@
         },
         function (err) {
           button.disabled = false;
-          button.textContent = err.code === err.PERMISSION_DENIED ? "Location permission denied" : "Location unavailable";
+          button.textContent = geolocationErrorLabel(err);
+          if (isPolicyBlockedError(err)) {
+            // Nothing the visitor can do about this one — it's the
+            // embedding page's <iframe> tag that needs changing, so
+            // say so where whoever embedded it will see it.
+            console.warn(
+              "[resilience-hubs-map] Geolocation is blocked by this page's permissions " +
+                "policy, so the visitor was never prompted. If this map is in an <iframe>, " +
+                'add allow="geolocation" to that <iframe> tag on the host page.'
+            );
+          }
           setTimeout(function () {
             button.textContent = defaultLabel;
           }, 3000);
@@ -775,9 +822,11 @@
 
     // Added right after the search control so it stacks directly below
     // it. Skipped entirely if the browser has no Geolocation API at
-    // all (very old browsers, or a non-secure/non-localhost origin) —
-    // no point offering a button that can only ever fail.
-    if (navigator.geolocation) {
+    // all (very old browsers, or a non-secure/non-localhost origin),
+    // or if a permissions policy has already ruled geolocation out
+    // (a cross-origin iframe without allow="geolocation") — no point
+    // offering a button that can only ever fail.
+    if (navigator.geolocation && !geolocationBlockedByPolicy()) {
       map.addControl(createFindClosestControl(map, entries), "top-left");
     }
 

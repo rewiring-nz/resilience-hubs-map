@@ -126,9 +126,27 @@ whole host page. Same root cause and fix as the sibling communities-map
 repo.
 
 **"Find closest hub" (`createFindClosestControl`) is only added to the
-map at all if `navigator.geolocation` exists** (checked at the call
-site in `renderHubs()`, not inside the function) — no point rendering a
-button that can only ever fail. It uses `enableHighAccuracy: false`
+map at all if `navigator.geolocation` exists and a permissions policy
+hasn't already ruled geolocation out** (both checked at the call site
+in `renderHubs()`, not inside the function) — no point rendering a
+button that can only ever fail. That second check
+(`geolocationBlockedByPolicy()`) exists because a **cross-origin
+`<iframe>` gets no geolocation unless its host page sets
+`allow="geolocation"` on the iframe tag** — and when it hasn't, the
+browser does not prompt: `getCurrentPosition()` fails immediately with
+`PERMISSION_DENIED`, identical in code to a real user denial, so the
+map would report a declined permission the visitor was never asked
+for. That is exactly what README Option A produced before the
+attribute was added to the documented snippet. Only Chromium exposes
+the policy up front (`document.featurePolicy` /
+`document.permissionsPolicy`); Safari and Firefox expose neither, so
+there the button still renders and `isPolicyBlockedError()` classifies
+the failure afterwards by sniffing `err.message` for a policy mention
+— a genuine user denial never mentions one. Verified in Chromium: a
+cross-origin frame without the attribute returns
+`allowsFeature("geolocation") === false` and errors with "Geolocation
+has been disabled in this document by permissions policy", *even when
+the site permission is already granted*. It uses `enableHighAccuracy: false`
 deliberately: hubs in this dataset are km apart, so network/wifi-based
 location is both good enough and meaningfully faster than waiting on a
 GPS lock. `maximumAge: 300000` lets a second click within 5 minutes

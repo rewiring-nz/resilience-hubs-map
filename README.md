@@ -170,7 +170,19 @@ Same interaction pattern as the Communities Map:
   few seconds. This button doesn't render at all if the browser has no
   Geolocation API (very old browsers, or loading the page over plain
   `http://` on anything other than `localhost` — geolocation requires a
-  secure context).
+  secure context), or if the page it's embedded on has blocked
+  geolocation outright (see below).
+
+  **If it says "Location blocked on this page" — or you're on an older
+  copy of this map and it says "Location permission denied" without
+  ever showing you a permission prompt —** the map is in an `<iframe>`
+  that hasn't been allowed to use geolocation. A cross-origin iframe
+  gets no location access unless the host page grants it, and the
+  browser doesn't prompt at all in that case, it just refuses. Fix it
+  by adding `allow="geolocation"` to the `<iframe>` tag on the host
+  page (it's in the snippet below); there's also a matching
+  explanation in the browser console. Nothing needs changing in this
+  repo for it.
 
 ## Embedding on Webflow
 
@@ -183,6 +195,7 @@ Two ways to add this map to a page — pick one:
   src="https://rewiring-nz.github.io/resilience-hubs-map/embed.html"
   style="width: 100%; height: 70vh; border: 0; border-radius: 12px;"
   loading="lazy"
+  allow="geolocation"
   title="Community Resilience Hubs Map">
 </iframe>
 ```
@@ -191,6 +204,14 @@ Two ways to add this map to a page — pick one:
    above into it (adjust the `height` in the `style` attribute to
    whatever you want).
 2. Publish the page.
+
+Keep the `allow="geolocation"` attribute — without it the browser
+refuses the "Find closest hub" button's location request outright,
+without ever prompting the visitor, and the button hides itself (or,
+on browsers that don't advertise the block up front, reports a denied
+permission nobody was asked for). Adding the attribute doesn't grant
+anything by itself: the visitor still gets, and can still decline, the
+normal browser prompt.
 
 Why this is the default recommendation: it points at the live,
 GitHub-hosted `embed.html`, so **any future update to this map** (bug
