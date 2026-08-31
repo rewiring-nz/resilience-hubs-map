@@ -10,6 +10,10 @@
   cooperativeGestures in the script at the bottom. The script builds a
   sidebar list around the <div> below itself at init time (see map.js's
   buildSidebarLayout) — you don't need to add anything else to the page.
+
+  Note: this file is generated from map.js/map.css (see CLAUDE.md's
+  regeneration pipeline) — don't hand-edit it directly, edit those and
+  regenerate instead, or your change will silently drift out of sync.
 -->
 
 <div id="resilience-hubs-map" class="rhm-map"></div>
@@ -277,13 +281,13 @@
   
   .rhm-popup {
     padding: 14px 16px 16px;
-    width: 300px;
+    width: 340px;
   }
   
   .rhm-popup__photo {
     display: block;
     width: 100%;
-    height: 140px;
+    height: 170px;
     object-fit: cover;
     margin: -14px -16px 10px;
     width: calc(100% + 32px);
@@ -305,7 +309,7 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    max-height: 260px;
+    max-height: 360px;
     overflow-y: auto;
   }
   
@@ -1112,7 +1116,7 @@
         // around; the popup content is still reachable by tabbing to it.
         var popup = new maplibregl.Popup({
           offset: 18,
-          maxWidth: "320px",
+          maxWidth: "360px",
           focusAfterOpen: false
         }).setHTML(popupHTML(feature.properties));
         popup.on("open", function () {

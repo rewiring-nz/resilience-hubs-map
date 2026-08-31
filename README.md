@@ -3,11 +3,11 @@
 A satellite-style MapLibre map of community resilience hubs across New
 Zealand, paired with a collapsible list of every hub (left of the map on
 desktop, overlaid on top of it on mobile). Clicking a marker or a list
-entry opens a popup with the hub's name, description, photo, and its
-resilience specs (solar, battery, generator, V2G, backup circuits,
-heating types, floor area). No API keys, no CMS — the data comes
-straight from a published Google Sheet, and the basemap uses free Esri
-World Imagery tiles.
+entry opens a popup with the hub's name, photo, and every other column
+from that row of the sheet (address, contact links, resilience specs —
+whatever's in the sheet, see [Columns](#1-columns) below). No API keys,
+no CMS — the data comes straight from a published Google Sheet, and the
+basemap uses free Esri World Imagery tiles.
 
 This is the same visual style and interaction pattern as the
 [Communities Map](https://github.com/rewiring-nz/communities-map) —
@@ -30,11 +30,21 @@ appear even on a fresh load.
 
 ## Files
 
-- `map.js` / `map.css` — the map logic and styling, split out for local dev.
+- `map.js` / `map.css` — the map logic and styling. Source of truth —
+  edit these, not the copies inlined into the two files below.
 - `index.html` — standalone preview, pointed at the real published sheet.
   Open this to test locally, or view it live at the GitHub Pages URL below.
-- `webflow-embed.html` — the same logic/styles inlined into one block,
-  ready to paste into a Webflow Embed element.
+- `embed.html` — a bare page (no title/description text) that fills
+  `100vh`, meant to be loaded in an `<iframe>` on another site. See
+  [Embedding on Webflow](#embedding-on-webflow) for the two ways to add
+  this map to a page and when to use each.
+- `webflow-embed.html` — `map.js`/`map.css` inlined into one block,
+  ready to paste directly into a Webflow Embed element (the alternative
+  to iframing `embed.html`).
+- `CLAUDE.md` — orientation for an AI coding assistant picking this repo
+  up cold (architecture, non-obvious decisions, gotchas). Read that
+  first if you're an agent working on this repo without prior context;
+  this README is the user-facing doc, CLAUDE.md is the contributor doc.
 
 ## Setting up the Google Sheet
 
@@ -124,9 +134,9 @@ each tab gets its own CSV URL under this publishing flow.
 - The photo (`Image1`) is only shown if present — hubs without a photo
   just show the title straight into the field list, no empty space left
   for it.
-- A hub with most columns filled in can easily have 15+ rows, so the
-  field list scrolls internally (capped around 260px tall) instead of
-  growing the popup taller than the map itself.
+- The card is 340px wide. A hub with most columns filled in can easily
+  have 15+ rows, so the field list scrolls internally (capped around
+  360px tall) instead of growing the popup taller than the map itself.
 - See the column table above for how each value's treatment (pill,
   link, or plain text) is decided.
 
@@ -151,30 +161,76 @@ Same interaction pattern as the Communities Map:
 - Only one popup is ever open at a time; the list highlights whichever
   hub's popup is currently open, however it was opened.
 
-## Webflow setup
+## Embedding on Webflow
+
+Two ways to add this map to a page — pick one:
+
+### Option A: iframe (recommended)
+
+```html
+<iframe
+  src="https://rewiring-nz.github.io/resilience-hubs-map/embed.html"
+  style="width: 100%; height: 70vh; border: 0; border-radius: 12px;"
+  loading="lazy"
+  title="Community Resilience Hubs Map">
+</iframe>
+```
+
+1. Add an **Embed** element anywhere on the page, paste the snippet
+   above into it (adjust the `height` in the `style` attribute to
+   whatever you want).
+2. Publish the page.
+
+Why this is the default recommendation: it points at the live,
+GitHub-hosted `embed.html`, so **any future update to this map** (bug
+fix, new feature, a design tweak) **applies automatically** — nobody
+ever needs to come back to this Webflow page and re-paste anything.
+Sizing is also simpler: the `<iframe>`'s own `style="height: ..."`
+controls the map's height directly, no wrapper-div trick needed (see
+below for why the inline option does need one).
+
+### Option B: inline paste
 
 1. Add an **Embed** element anywhere on the page.
 2. Paste the full contents of `webflow-embed.html` into it.
-3. If you want a fixed map height on mobile (see above), wrap the Embed
-   in a Div block and set that div's Max Height (e.g. `70vh`) — this is
-   optional, it just falls back to a sensible default without it.
+3. If you want a fixed map height on mobile, wrap the Embed in a Div
+   block and set that div's Max Height (e.g. `70vh`) — optional, falls
+   back to a sensible default without it. See "Sidebar list, search,
+   mobile behavior" above for why this only affects mobile.
 4. Publish the page.
+
+Use this instead of the iframe if you specifically want the map's DOM
+to live directly on your page (e.g. for host-page CSS to reach into
+it) — the tradeoff is that **every future update has to be manually
+re-pasted** here, since this is a frozen copy rather than a live
+reference to the GitHub-hosted files.
 
 ### Customize
 
-- **`sheetCsvUrl`** — near the bottom of `webflow-embed.html`, in the
-  `initResilienceHubsMap({...})` call. Point this at your own sheet's
-  published CSV URL (see setup above) if you're duplicating this for a
-  different dataset.
+Both options read from the same `map.js`; only where you set these
+options differs (`webflow-embed.html`'s own `initResilienceHubsMap({...})`
+call near the bottom for Option B, or by editing `embed.html` in this
+repo — which then applies to every page using Option A — for Option B's
+sibling).
+
+- **`sheetCsvUrl`** — point this at your own sheet's published CSV URL
+  (see setup above) if you're duplicating this for a different dataset.
 - **Marker color / popup styling** — edit the `<style>` block
-  (`.rhm-marker`, `.rhm-popup*`, `.rhm-pill*` classes).
-- **Scroll-zoom gesture lock** — `cooperativeGestures: false` in the same
+  (`.rhm-marker`, `.rhm-popup*`, `.rhm-pill*` classes) — in `map.css`
+  for `embed.html`/`index.html`, or the inlined `<style>` block for
+  `webflow-embed.html`.
+- **Scroll-zoom gesture lock** — `cooperativeGestures: false` in the
   init call restores plain scroll-to-zoom instead of requiring Ctrl/⌘.
 - **List shown by default** — `showListByDefault: false` starts with the
   list hidden and the "Show hub list" button visible instead.
-- **Initial center/zoom** — `NZ_CENTER` and `zoom` in the script. The map
-  auto-fits to whatever hubs are present once loaded, so this only
-  matters before data loads or with a single hub.
+- **Initial center/zoom** — `INITIAL_CENTER` / `INITIAL_ZOOM` near the
+  top of the script, currently set to Queenstown Lakes district (where
+  every hub in the sheet currently is), so the map opens already zoomed
+  in there instead of flashing the whole country before `fitToHubs()`
+  (which runs once the sheet data has loaded) narrows it down. If hubs
+  outside this district get added later, `fitToHubs()` still adjusts to
+  fit all of them on load — this constant only affects the very first
+  paint, before that fetch resolves.
 - **Basemap** — currently Esri World Imagery (satellite) with an Esri
   reference-labels overlay, same as the Communities Map.
 

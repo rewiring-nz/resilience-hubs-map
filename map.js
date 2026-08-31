@@ -631,7 +631,7 @@
       // around; the popup content is still reachable by tabbing to it.
       var popup = new maplibregl.Popup({
         offset: 18,
-        maxWidth: "320px",
+        maxWidth: "360px",
         focusAfterOpen: false
       }).setHTML(popupHTML(feature.properties));
       popup.on("open", function () {
