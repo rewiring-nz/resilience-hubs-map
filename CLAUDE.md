@@ -76,10 +76,10 @@ own) — worth checking there before re-solving something already solved.
 
 ## Non-obvious design decisions
 
-**Popup fields are fully generic, not a fixed schema.** `map.js`'s
+**Card fields are fully generic, not a fixed schema.** `map.js`'s
 `rowsToFeatureCollection()` only special-cases `Name`/`Lat`/`Lng`/
 `Image1`/`Image2` (see `SPECIAL_FIELDS`) — every other column in the
-sheet becomes a field in `properties.fields`, and `popupHTML()` just
+sheet becomes a field in `properties.fields`, and `cardHTML()` just
 iterates `Object.keys(props.fields)` to render one row per column, in
 the sheet's own left-to-right order (JS preserves string-key insertion
 order, so this "just works" without sorting). **Do not** reintroduce a
@@ -88,6 +88,34 @@ can add/rename/reorder columns without needing a code change. Each
 value's rendering (colored pill for Yes/No/Unknown, clickable link for
 a URL or email, plain text otherwise) is decided per-value by
 `specRow()`/`linkifyValue()`, not per-column.
+
+**Hub details are a slide-out panel, not a MapLibre popup.** There is no
+`maplibregl.Popup` in this codebase anymore: selecting a hub renders
+`cardHTML()` into `.rhm-detail__body` and lets `syncPanels()` decide
+which panels are showing. Two panels flank the map in DOM order — the
+hub list (`.rhm-sidebar`, left on desktop) and the detail dashboard
+(`.rhm-detail`, right on desktop) — and on mobile both become bottom
+sheets where only one can show at a time, so selecting a hub swaps the
+list out for its details and deselecting swaps it back.
+
+That mobile swap is why every panel visibility change goes through
+`syncPanels()` rather than each call site toggling `is-hidden` itself:
+whether the list shows is not just "did the user open it" (`listWanted`)
+but that *and* whether a hub is selected *and* whether we're at mobile
+width. Deriving it in one place is what keeps "✕ on the details panel"
+and "‹ All hubs" and "clicked the map" from each needing their own copy
+of that logic. Add new entry points by setting `listWanted`/
+`activeEntry` and calling `syncPanels()`, not by toggling classes.
+
+**The detail panel's width lives on the inner `.rhm-detail__panel`, not
+on `.rhm-detail`.** The outer element is what animates to `width: 0`
+when nothing is selected; if the width lived there too, collapsing it
+would re-wrap every line of the card's text on every frame of the
+transition. The inner panel's `flex: 0 0 360px` keeps the content at
+full width while it slides out of the (`overflow: hidden`) outer box.
+On mobile, `.rhm-detail` is instead a `max-height`-capped flex container
+— capping it also caps the stretched panel inside, which is what makes
+`.rhm-detail__body` scroll rather than the sheet growing past the map.
 
 **CSV parsing is hand-rolled** (`parseCSV()`) rather than a naive
 `.split(",")`, because real sheet data has commas inside quoted cells
@@ -107,29 +135,40 @@ computed this from auto-sizing to content" via computed `height`. Only
 `max-height` has that distinction (`"none"` vs. a length), so it's the
 only reliable signal.
 
-**Mobile sidebar needs its own stacking context, or the map paints over
-it.** On mobile, `.rhm-map` gets `position: relative; z-index: 0` and
-`.rhm-sidebar` gets `z-index: 1` — without this, MapLibre's own
-internal z-indexed layers (canvas, controls, popups) end up painting
-*over* the sidebar despite the sidebar being `position: absolute`,
-because neither element had an explicit stacking context to contain
-that internal z-index competition. Found by literally checking
-`document.elementFromPoint()` at the sidebar's own coordinates and
-seeing `<canvas>` come back instead of the sidebar.
+**Mobile bottom sheets need their own stacking context, or the map
+paints over them.** On mobile, `.rhm-map` gets `position: relative;
+z-index: 0`, `.rhm-sidebar` gets `z-index: 1` and `.rhm-detail` gets
+`z-index: 2` — without this, MapLibre's own internal z-indexed layers
+(canvas, controls) end up painting *over* the sheets despite them being
+`position: absolute`, because neither element had an explicit stacking
+context to contain that internal z-index competition. Found by literally
+checking `document.elementFromPoint()` at the sidebar's own coordinates
+and seeing `<canvas>` come back instead of the sidebar.
 
-**`.rhm-sidebar` needs `width: auto` in the mobile media query.** The
-desktop rule sets an explicit `width: 240px`; the mobile rule tries to
-stretch it full-width via `left: 0; right: 0`, but with an explicit
-width already set, `left`+`right`+`width` together over-constrain the
+**Both panels need `width: auto` in the mobile media query.** The
+desktop rules set an explicit width (`240px` on `.rhm-sidebar`, `360px`
+on `.rhm-detail`); the mobile rules try to stretch each full-width via
+`left: 0; right: 0`, but with an explicit width already set, `left`+`right`+`width` together over-constrain the
 box, and the browser keeps the explicit width rather than stretching —
 silently, no console warning. `width: auto` releases that constraint.
 
-**Popups use `focusAfterOpen: false`.** MapLibre's default auto-focuses
-a popup's first link on open, which triggers the browser's native
-focus-scroll — combined with `flyTo()` running at the same time (popup
-opens before the camera finishes moving), this can jank-scroll the
-whole host page. Same root cause and fix as the sibling communities-map
-repo.
+**Marker clicks deliberately don't zoom; every other way of selecting a
+hub does.** `focusEntry()`'s `zoomIn` argument is true for the list,
+search and "find closest" (the hub may be off-screen entirely, so it
+flies in to at least zoom 12) and false for a marker click, where the
+visitor is already looking straight at the marker and only needs the
+camera eased clear of the panel about to open over it. On mobile that
+easing also applies a `[0, -20% of map height]` camera offset, since the
+detail sheet covers the bottom of the map — without it you select a hub
+and it disappears behind its own details.
+
+**An earlier version of this map used MapLibre popups with
+`focusAfterOpen: false`,** because MapLibre's default auto-focuses a
+popup's first link on open and the resulting native focus-scroll, racing
+`flyTo()`, could jank-scroll the whole host page (same root cause and
+fix as the sibling communities-map repo). The panel doesn't have that
+problem — it isn't map-anchored and nothing auto-focuses it — but if you
+ever reintroduce a popup here for anything, that's the trap.
 
 **"Find closest hub" (`createFindClosestControl`) is only added to the
 map at all if `navigator.geolocation` exists** (checked at the call

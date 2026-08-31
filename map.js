@@ -1,8 +1,10 @@
 /* Community Resilience Hubs Map — MapLibre GL init
    Reads hub data from a published Google Sheet (as CSV) at load time,
-   then plots markers with click-to-open popups showing each hub's
-   resilience specs. Safe to inline into a Webflow Embed alongside
-   map.css. See README.md for how the sheet needs to be set up. */
+   then plots markers. Selecting a hub (marker, list entry, or search)
+   opens its details in a slide-out dashboard panel — on the right of
+   the map on desktop, docked to the bottom on mobile — rather than in a
+   map popup. Safe to inline into a Webflow Embed alongside map.css.
+   See README.md for how the sheet needs to be set up. */
 
 (function () {
   // Centered on Queenstown Lakes district — where every hub in the
@@ -90,11 +92,11 @@
     });
   }
 
-  // Columns handled specially elsewhere in the popup (title, marker
-  // position, header photo) rather than as a generic field row — every
-  // other column in the sheet, whatever it's called, shows up in the
-  // popup automatically. This is what lets you add/rename/remove a
-  // column in the sheet without ever touching this file: popupHTML()
+  // Columns handled specially elsewhere in the detail card (title,
+  // marker position, header photo) rather than as a generic field row —
+  // every other column in the sheet, whatever it's called, shows up in
+  // the card automatically. This is what lets you add/rename/remove a
+  // column in the sheet without ever touching this file: cardHTML()
   // below just iterates whatever's left in `fields`, in the sheet's own
   // column order.
   var SPECIAL_FIELDS = { Name: true, Lat: true, Lng: true, Image1: true, Image2: true };
@@ -145,7 +147,7 @@
       .toLowerCase();
   }
 
-  // ---- Popup content ----------------------------------------------------
+  // ---- Detail card content ----------------------------------------------
 
   var EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -154,16 +156,16 @@
   // "Brochure" column (or any future column with a URL/email in it)
   // just works. Link text stays short ("Open ↗") since the column
   // LABEL already says what it links to; a raw URL would often be
-  // longer than the whole popup is wide.
+  // longer than the whole panel is wide.
   function linkifyValue(v) {
     if (/^https?:\/\//i.test(v)) {
       return (
-        '<a class="rhm-popup__spec-link" href="' + escapeHTML(v) +
+        '<a class="rhm-card__spec-link" href="' + escapeHTML(v) +
         '" target="_blank" rel="noopener noreferrer">Open ↗</a>'
       );
     }
     if (EMAIL_PATTERN.test(v)) {
-      return '<a class="rhm-popup__spec-link" href="mailto:' + escapeHTML(v) + '">' + escapeHTML(v) + "</a>";
+      return '<a class="rhm-card__spec-link" href="mailto:' + escapeHTML(v) + '">' + escapeHTML(v) + "</a>";
     }
     return null;
   }
@@ -184,20 +186,24 @@
     if (pillClass) {
       valueHTML = '<span class="rhm-pill' + pillClass + '">' + escapeHTML(v) + "</span>";
     } else {
-      valueHTML = linkifyValue(v) || ('<span class="rhm-popup__spec-value">' + escapeHTML(v) + "</span>");
+      valueHTML = linkifyValue(v) || ('<span class="rhm-card__spec-value">' + escapeHTML(v) + "</span>");
     }
 
     return (
-      '<div class="rhm-popup__spec-row">' +
-      '<span class="rhm-popup__spec-label">' + escapeHTML(label) + "</span>" +
+      '<div class="rhm-card__spec-row">' +
+      '<span class="rhm-card__spec-label">' + escapeHTML(label) + "</span>" +
       valueHTML +
       "</div>"
     );
   }
 
-  function popupHTML(props) {
+  // Rendered into the detail panel's scrolling body (.rhm-detail__body),
+  // which is what scrolls when a hub has more fields than fit — the spec
+  // list itself deliberately has no internal scroll area of its own, so
+  // the whole card reads as one continuous document.
+  function cardHTML(props) {
     var photo = props.image1
-      ? '<img class="rhm-popup__photo" src="' + escapeHTML(props.image1) + '" alt="">'
+      ? '<img class="rhm-card__photo" src="' + escapeHTML(props.image1) + '" alt="">'
       : "";
 
     var specs = "";
@@ -206,10 +212,10 @@
     });
 
     return (
-      '<div class="rhm-popup">' +
+      '<div class="rhm-card">' +
       photo +
-      '<h3 class="rhm-popup__title">' + escapeHTML(props.name) + "</h3>" +
-      (specs ? '<div class="rhm-popup__specs">' + specs + "</div>" : "") +
+      '<h3 class="rhm-card__title">' + escapeHTML(props.name) + "</h3>" +
+      (specs ? '<div class="rhm-card__specs">' + specs + "</div>" : "") +
       "</div>"
     );
   }
@@ -236,19 +242,46 @@
     return el;
   }
 
-  // Flies to an entry's marker and opens its popup. Shared by the search
-  // box and the sidebar list so both behave identically. scrollToMap is
-  // true for the sidebar list, where on mobile the list sits below/over
-  // the map and selecting an item should bring the map back into view.
-  function focusEntry(map, entry, scrollToMap) {
-    map.flyTo({
+  // Moves the camera to an entry's marker and opens its detail panel.
+  // Shared by the marker clicks, the search box and the sidebar list so
+  // all three behave identically.
+  //
+  // scrollToMap is true for the sidebar list, where on mobile the list
+  // sits below/over the map and selecting an item should bring the map
+  // back into view. zoomIn is for jumps from the list, search or "find
+  // closest", where the hub may be off-screen entirely; a marker click
+  // leaves the zoom alone, since the visitor is already looking right at
+  // the marker and the camera only needs nudging clear of the panel
+  // that's about to open over it.
+  function focusEntry(map, entry, scrollToMap, zoomIn) {
+    var camera = {
       center: entry.feature.geometry.coordinates,
-      zoom: Math.max(map.getZoom(), 12)
-    });
-    entry.marker.togglePopup();
+      // On mobile the detail panel docks over the bottom of the map, so
+      // aim above the container's center — otherwise the hub just
+      // selected ends up behind the panel showing its details.
+      offset: isMobileViewport()
+        ? [0, -Math.round(map.getContainer().clientHeight * 0.2)]
+        : [0, 0]
+    };
+
+    if (zoomIn) {
+      camera.zoom = Math.max(map.getZoom(), 12);
+      map.flyTo(camera);
+    } else {
+      map.easeTo(camera);
+    }
+
+    entry.select();
     if (scrollToMap) {
       map.getContainer().scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
+  }
+
+  // Single source of truth for "are we in the mobile layout" — must stay
+  // in step with the `max-width: 767px` media query in map.css, which is
+  // what actually docks both panels to the bottom edge.
+  function isMobileViewport() {
+    return window.matchMedia("(max-width: 767px)").matches;
   }
 
   // ---- Name-label collision handling -------------------------------
@@ -324,7 +357,7 @@
     }
 
     function selectEntry(entry) {
-      focusEntry(map, entry);
+      focusEntry(map, entry, false, true);
       input.value = entry.feature.properties.name;
       clearResults();
       input.blur();
@@ -447,7 +480,7 @@
           button.disabled = false;
           button.textContent = defaultLabel;
           var closest = closestEntry(entries, pos.coords.latitude, pos.coords.longitude);
-          if (closest) focusEntry(map, closest, false);
+          if (closest) focusEntry(map, closest, false, true);
         },
         function (err) {
           button.disabled = false;
@@ -477,11 +510,13 @@
     };
   }
 
-  // ---- Sidebar list -----------------------------------------------------
-  // Wraps the map container in a layout with a collapsible list beside it
-  // (overlaid on top of it on mobile, via CSS — see map.css). Restructures
-  // the DOM itself so the Webflow embed only ever needs the one plain map
-  // <div>.
+  // ---- Layout: hub list + detail panel ----------------------------------
+  // Wraps the map container in a layout with two panels: the collapsible
+  // hub list before it (left of the map on desktop) and the slide-out
+  // detail dashboard after it (right of the map on desktop). On mobile
+  // both are overlaid on the map's bottom edge instead, via CSS — see
+  // map.css. Restructures the DOM itself so the Webflow embed only ever
+  // needs the one plain map <div>.
 
   function buildSidebarLayout(mapContainer) {
     var layout = document.createElement("div");
@@ -512,11 +547,66 @@
     sidebar.appendChild(header);
     sidebar.appendChild(list);
 
+    // Detail panel. Its inner .rhm-detail__panel carries the fixed width
+    // so that collapsing the outer element to `width: 0` slides the
+    // whole panel out of view without reflowing its text on every frame
+    // of the transition.
+    var detail = document.createElement("aside");
+    detail.className = "rhm-detail is-hidden";
+    detail.setAttribute("aria-label", "Selected hub details");
+
+    var detailPanel = document.createElement("div");
+    detailPanel.className = "rhm-detail__panel";
+
+    var detailHeader = document.createElement("div");
+    detailHeader.className = "rhm-detail__header";
+
+    // Shown on mobile only (where the list and this panel share the same
+    // bottom-docked space, so one has to give way to the other) — it
+    // swaps back to the full hub list. On desktop both panels are
+    // visible at once, so there's nothing to swap back to and CSS hides
+    // this in favor of the static eyebrow label.
+    var detailBack = document.createElement("button");
+    detailBack.type = "button";
+    detailBack.className = "rhm-detail__back";
+    detailBack.innerHTML = "‹ All hubs";
+
+    var detailEyebrow = document.createElement("span");
+    detailEyebrow.className = "rhm-detail__eyebrow";
+    detailEyebrow.textContent = "Hub details";
+
+    var detailClose = document.createElement("button");
+    detailClose.type = "button";
+    detailClose.className = "rhm-detail__close";
+    detailClose.setAttribute("aria-label", "Close hub details");
+    detailClose.innerHTML = "✕";
+
+    var detailBody = document.createElement("div");
+    detailBody.className = "rhm-detail__body";
+
+    detailHeader.appendChild(detailBack);
+    detailHeader.appendChild(detailEyebrow);
+    detailHeader.appendChild(detailClose);
+    detailPanel.appendChild(detailHeader);
+    detailPanel.appendChild(detailBody);
+    detail.appendChild(detailPanel);
+
     mapContainer.parentNode.insertBefore(layout, mapContainer);
     layout.appendChild(sidebar);
     layout.appendChild(mapContainer);
+    layout.appendChild(detail);
 
-    return { root: layout, sidebar: sidebar, title: title, closeBtn: closeBtn, list: list };
+    return {
+      root: layout,
+      sidebar: sidebar,
+      title: title,
+      closeBtn: closeBtn,
+      list: list,
+      detail: detail,
+      detailBody: detailBody,
+      detailBack: detailBack,
+      detailClose: detailClose
+    };
   }
 
   // A plain button, added as a map control (stacks under the search box
@@ -545,7 +635,7 @@
     };
   }
 
-  // Keeps the map canvas in sync while .rhm-sidebar's width/max-height
+  // Keeps the map canvas in sync while a panel's width/max-height
   // CSS-transitions open or closed — map.resize() only reads the
   // container's CURRENT size, so it has to be called repeatedly across
   // the transition, not just once at the end.
@@ -696,14 +786,31 @@
     return map;
   }
 
-  // Everything that depends on the loaded data — markers, popups, the
-  // sidebar list, search, and the map fitting itself to the hubs it got.
+  // Everything that depends on the loaded data — markers, the detail
+  // panel, the sidebar list, search, and the map fitting itself to the
+  // hubs it got.
   function renderHubs(map, container, layout, geojson, opts) {
-    // Only one popup open (and one sidebar item highlighted) at a time —
-    // opening a new one closes/unhighlights whatever was previously
-    // open, regardless of how it was opened (marker click, search, or
-    // the sidebar list).
-    var openPopup = null;
+    // ---- Panel state ---------------------------------------------------
+    // Two panels share the layout: the hub list and the detail dashboard
+    // for whichever hub is selected. On desktop they sit on opposite
+    // sides of the map and are independent. On mobile they dock to the
+    // same bottom edge and only one can show at a time, so selecting a
+    // hub swaps the list out for that hub's details and deselecting
+    // swaps the list back — hence deriving both panels' visibility from
+    // this one pair of state values in syncPanels() rather than toggling
+    // each panel's class at its own call sites.
+    //
+    // listWanted is read from the options once, at init, rather than
+    // being kept in sync with the viewport: it's about what a visitor
+    // sees on first paint for the device they're on, not a layout rule
+    // that should flip the list open or closed mid-session just because
+    // they resized the window.
+    var listWanted = isMobileViewport()
+      ? opts.showListByDefaultOnMobile
+      : opts.showListByDefault;
+    var activeEntry = null;
+    var showListControl = null; // created further down; see syncPanels
+
     var activeListItem = null;
     function setActiveListItem(el) {
       if (activeListItem) activeListItem.classList.remove("rhm-sidebar__item--active");
@@ -711,42 +818,78 @@
       activeListItem = el;
     }
 
+    var activeMarkerInner = null;
+    function setActiveMarker(entry) {
+      if (activeMarkerInner) activeMarkerInner.classList.remove("rhm-marker__inner--active");
+      activeMarkerInner = entry ? entry.innerEl : null;
+      if (activeMarkerInner) activeMarkerInner.classList.add("rhm-marker__inner--active");
+    }
+
+    function syncPanels(animate) {
+      var mobile = isMobileViewport();
+      var listVisible = listWanted && !(mobile && activeEntry);
+
+      layout.sidebar.classList.toggle("is-hidden", !listVisible);
+      layout.detail.classList.toggle("is-hidden", !activeEntry);
+      // Squares off the map's right-hand corners while the detail panel
+      // is butted up against them.
+      layout.root.classList.toggle("rhm-layout--detail", !!activeEntry);
+
+      // While the detail panel occupies the mobile sheet, "Show hub
+      // list" would have nowhere to show the list — the panel's own
+      // "‹ All hubs" back button is the way back in that state.
+      if (showListControl) {
+        showListControl.element.style.display =
+          listVisible || (mobile && activeEntry) ? "none" : "";
+      }
+
+      if (animate) animateMapResize(map, 300);
+    }
+
+    // Only one hub is ever selected — selecting a new one replaces the
+    // detail panel's contents and moves the list highlight, regardless
+    // of how it was selected (marker click, search, or the list).
+    function selectEntry(entry) {
+      activeEntry = entry;
+      layout.detailBody.innerHTML = cardHTML(entry.feature.properties);
+      layout.detailBody.scrollTop = 0;
+      setActiveListItem(entry.listItemEl);
+      setActiveMarker(entry);
+      syncPanels(true);
+    }
+
+    // showList is true for the mobile "‹ All hubs" back button, which
+    // should always land on the list; false for the ✕ and for clicking
+    // the map itself, which dismiss the panel back to whatever the list
+    // was doing before.
+    function clearSelection(showList) {
+      activeEntry = null;
+      setActiveListItem(null);
+      setActiveMarker(null);
+      if (showList) listWanted = true;
+      syncPanels(true);
+    }
+
     var entries = geojson.features.map(function (feature) {
       var entry = { feature: feature };
-
-      // focusAfterOpen: false — MapLibre's default (true) auto-focuses
-      // the popup's first focusable element as soon as it opens, and the
-      // browser's default focus behavior scrolls that element into view.
-      // Since we call togglePopup() right after starting flyTo() —
-      // before the camera has actually moved — the popup is still
-      // positioned at the OLD, pre-animation screen coordinates, so that
-      // focus-scroll can jump the whole page to a wild position before
-      // our own animation settles it back. Disabling it trades away that
-      // keyboard/screen-reader convenience for not yanking the page
-      // around; the popup content is still reachable by tabbing to it.
-      var popup = new maplibregl.Popup({
-        offset: 18,
-        maxWidth: "360px",
-        focusAfterOpen: false
-      }).setHTML(popupHTML(feature.properties));
-      popup.on("open", function () {
-        if (openPopup && openPopup !== popup) openPopup.remove();
-        openPopup = popup;
-        setActiveListItem(entry.listItemEl);
-      });
+      entry.select = function () {
+        selectEntry(entry);
+      };
 
       var el = createMarkerEl(feature.properties.name);
       var marker = new maplibregl.Marker({ element: el, anchor: "bottom" })
         .setLngLat(feature.geometry.coordinates)
-        .setPopup(popup)
         .addTo(map);
 
-      // Attached explicitly rather than relying on the library's own
-      // marker-click-to-popup binding, which doesn't fire reliably
-      // across MapLibre versions.
+      // Attached to the marker element itself rather than going through
+      // MapLibre's own marker/popup binding — there's no popup involved
+      // anymore, and that binding never fired reliably across MapLibre
+      // versions anyway. stopPropagation keeps this click from also
+      // reaching the map's own click handler, which deselects.
       el.addEventListener("click", function (evt) {
         evt.stopPropagation();
-        marker.togglePopup();
+        if (activeEntry === entry) clearSelection(false);
+        else focusEntry(map, entry, false, false);
       });
 
       var listItemButton = document.createElement("button");
@@ -755,13 +898,14 @@
       listItemButton.innerHTML =
         '<span class="rhm-sidebar__item-name">' + escapeHTML(feature.properties.name) + "</span>";
       listItemButton.addEventListener("click", function () {
-        focusEntry(map, entry, true);
+        focusEntry(map, entry, true, true);
       });
       var listItem = document.createElement("li");
       listItem.appendChild(listItemButton);
       layout.list.appendChild(listItem);
 
       entry.marker = marker;
+      entry.innerEl = el.querySelector(".rhm-marker__inner");
       entry.pinEl = el.querySelector(".rhm-marker__pin");
       entry.labelEl = el.querySelector(".rhm-marker__label");
       entry.listItemEl = listItemButton;
@@ -788,31 +932,54 @@
     }
 
     // Added after those so it stacks below them in the top-left corner.
-    // Only shown while the sidebar is hidden.
-    var showListControl = createShowListControl(function () {
-      setSidebarVisible(true);
+    // Only shown while the hub list is hidden (see syncPanels).
+    showListControl = createShowListControl(function () {
+      listWanted = true;
+      syncPanels(true);
     });
     map.addControl(showListControl, "top-left");
 
-    function setSidebarVisible(visible) {
-      layout.sidebar.classList.toggle("is-hidden", !visible);
-      showListControl.element.style.display = visible ? "none" : "";
-      animateMapResize(map, 260);
-    }
-
-    // Set directly (no animation) for the starting state. Checked at
-    // init time only (not kept in sync on resize) — deliberately: this
-    // is about what the visitor sees on first paint for whichever
-    // device they're on, not a layout rule that should flip the list
-    // open/closed mid-session just because they resized the window.
-    var startsOnMobile = window.matchMedia("(max-width: 767px)").matches;
-    var startVisible = startsOnMobile ? opts.showListByDefaultOnMobile : opts.showListByDefault;
-    layout.sidebar.classList.toggle("is-hidden", !startVisible);
-    showListControl.element.style.display = startVisible ? "none" : "";
-
     layout.closeBtn.addEventListener("click", function () {
-      setSidebarVisible(false);
+      listWanted = false;
+      syncPanels(true);
     });
+
+    // ✕ dismisses the detail panel entirely; "‹ All hubs" (mobile) hands
+    // the bottom sheet back to the list instead.
+    layout.detailClose.addEventListener("click", function () {
+      clearSelection(false);
+    });
+    layout.detailBack.addEventListener("click", function () {
+      clearSelection(true);
+    });
+
+    // Clicking bare map deselects, the way clicking off a popup used to
+    // close it. Marker clicks stopPropagation (see above), so this only
+    // fires for clicks that missed every hub — and MapLibre doesn't emit
+    // `click` at the end of a drag, so panning the map won't deselect.
+    map.on("click", function () {
+      if (activeEntry) clearSelection(false);
+    });
+
+    document.addEventListener("keydown", function (evt) {
+      if (evt.key === "Escape" && activeEntry) clearSelection(false);
+    });
+
+    // Crossing the desktop/mobile breakpoint changes whether the list
+    // and the detail panel can be shown at the same time, so re-derive
+    // both from the current state (without animating — nothing was
+    // deliberately opened or closed here).
+    window.addEventListener("resize", function () {
+      syncPanels(false);
+      // The class changes above can hand width back to the map (a panel
+      // that was beside it on desktop becomes an overlay on mobile), so
+      // the canvas needs re-measuring after them, not just from the
+      // resize handler in initResilienceHubsMap that ran before this.
+      map.resize();
+    });
+
+    // Starting state, applied without animation.
+    syncPanels(false);
 
     function fitToHubs(fitOptions) {
       if (geojson.features.length <= 1) return;

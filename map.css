@@ -1,5 +1,6 @@
 /* Community Resilience Hubs Map — styles
-   Marker pin + popup theming. Safe to inline into a Webflow Embed. */
+   Marker pin, hub list, and slide-out detail panel theming. Safe to
+   inline into a Webflow Embed. */
 
 /* Scoped so this doesn't depend on the host page already having a
    border-box reset. Without it, elements below that combine `width` and
@@ -13,9 +14,10 @@
   box-sizing: border-box;
 }
 
-/* Sidebar (desktop: left of the map) + map, side by side. map.js builds
-   this wrapper around the plain <div id="resilience-hubs-map"> at init
-   time, so the Webflow embed itself never needs to change. */
+/* Three columns on desktop: hub list, map, detail panel — in that DOM
+   order. map.js builds this wrapper around the plain
+   <div id="resilience-hubs-map"> at init time, so the Webflow embed
+   itself never needs to change. */
 .rhm-layout {
   display: flex;
   align-items: stretch;
@@ -30,10 +32,17 @@
 }
 
 /* Rounded corners live on the canvas itself, not on .rhm-map — clipping
-   the whole map container would also clip popups whenever they open near
-   an edge, hiding them instead of letting them spill outside the map. */
+   the whole map container would also clip anything MapLibre positions
+   near an edge, hiding it instead of letting it spill outside the map. */
 .rhm-map .maplibregl-canvas {
   border-radius: 0 12px 12px 0;
+}
+
+/* Square off the right edge while the detail panel is butted against
+   it, so the two read as one surface rather than a rounded card with a
+   panel awkwardly overlapping its corner. */
+.rhm-layout--detail .rhm-map .maplibregl-canvas {
+  border-radius: 0;
 }
 
 .rhm-sidebar {
@@ -142,13 +151,148 @@
   color: rgba(255, 255, 255, 0.6);
 }
 
+/* Detail panel (desktop: right of the map) — the slide-out dashboard
+   that replaced the old map popup. Collapses to zero width when nothing
+   is selected, the same way .rhm-sidebar does, so the map reclaims the
+   space rather than sitting under a permanently reserved column.
+
+   The panel's real width lives on the inner .rhm-detail__panel, which is
+   flex-sized so it can't shrink: if the width lived on .rhm-detail
+   itself, animating that width to 0 would re-wrap every line of the
+   card's text on every frame of the transition. Here the contents keep
+   their full width and simply slide out of the collapsing (overflow:
+   hidden) outer element. */
+.rhm-detail {
+  display: flex;
+  width: 360px;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: #fff;
+  border-radius: 0 12px 12px 0;
+  box-shadow: -6px 0 18px rgba(0, 0, 0, 0.18);
+  transition: width 0.28s ease, opacity 0.2s ease;
+}
+
+.rhm-detail.is-hidden {
+  width: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rhm-detail__panel {
+  flex: 0 0 360px;
+  display: flex;
+  flex-direction: column;
+  /* Lets .rhm-detail__body's own overflow do the scrolling, instead of
+     this column growing past the layout to fit a long field list. */
+  min-height: 0;
+  background: #fff;
+}
+
+.rhm-detail__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 12px 14px;
+  background: #527570;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rhm-detail__eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+/* Mobile only — see the media query below. On desktop the hub list is
+   visible beside the map at the same time as this panel, so there's
+   nothing to swap back to. */
+.rhm-detail__back {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px 4px 6px;
+  border: none;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rhm-detail__back:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.rhm-detail__close {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.rhm-detail__close:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* The one scroll container for the card — a hub with most columns filled
+   in can easily run to 15+ rows, and scrolling the whole card together
+   (photo, title and fields) reads better than the old popup's separately
+   scrolling field list inside a fixed-height box. */
+.rhm-detail__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Small desktops / landscape tablets: the list and an open detail panel
+   at their full widths would leave barely any map between them, so trim
+   both. Still wide enough for the card's label + value columns. The
+   `.is-hidden` collapse rules outrank these on specificity, so a
+   collapsed panel stays collapsed. */
+@media (min-width: 768px) and (max-width: 1099px) {
+  .rhm-sidebar {
+    width: 200px;
+  }
+
+  .rhm-detail {
+    width: 300px;
+  }
+
+  .rhm-detail__panel {
+    flex-basis: 300px;
+  }
+}
+
 /* Mobile: the map fills the entire layout (which map.js sizes to match
    whatever height the element wrapping this embed provides — see the
-   height-detection comment in map.js). The list is an overlay docked to
-   the bottom, growing its own max-height from 0 when shown rather than
-   pushing the map into a smaller area, so the map's size never changes
-   as the list opens/closes and the total never exceeds the layout's own
-   height the way stacking map+list would. */
+   height-detection comment in map.js). The list and the detail panel are
+   both overlays docked to the bottom, growing their own max-height from
+   0 when shown rather than pushing the map into a smaller area, so the
+   map's size never changes as they open/close and the total never
+   exceeds the layout's own height the way stacking map+panel would.
+
+   Only one of the two is ever shown at once down here — there isn't room
+   for both — so selecting a hub swaps the list out for its details and
+   deselecting swaps the list back. That swap is driven from map.js's
+   syncPanels(); this stylesheet only decides where each panel sits. */
 @media (max-width: 767px) {
   .rhm-layout {
     display: block;
@@ -200,6 +344,52 @@
     opacity: 0;
     pointer-events: none;
   }
+
+  /* Same bottom-sheet treatment as the list, one layer above it (they're
+     never both visible, but this keeps the swap from ever flashing the
+     list through the panel mid-transition). Taller than the list's 60%
+     because this is the content the visitor actually came to read.
+
+     .rhm-detail is itself a flex container, so capping it with
+     max-height also caps the stretched .rhm-detail__panel inside it —
+     which is what makes .rhm-detail__body scroll here instead of the
+     sheet growing past the map. */
+  .rhm-detail {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    /* Releases the desktop `width: 360px` so `left`/`right: 0` can
+       stretch the sheet full-width — see the same note on .rhm-sidebar
+       above. */
+    width: auto;
+    max-height: 70%;
+    border-radius: 14px 14px 12px 12px;
+    box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.35);
+    transition: max-height 0.28s ease, opacity 0.2s ease;
+  }
+
+  .rhm-detail.is-hidden {
+    max-height: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .rhm-detail__panel {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  /* Swaps the sheet back to the full hub list; takes the place of the
+     desktop eyebrow label, which has nothing to swap to. */
+  .rhm-detail__back {
+    display: inline-flex;
+  }
+
+  .rhm-detail__eyebrow {
+    display: none;
+  }
 }
 
 /* .rhm-marker is the element MapLibre owns and positions — it must carry
@@ -230,6 +420,23 @@
   transform: scale(1.15);
 }
 
+/* Marks whichever hub the detail panel is currently showing — with the
+   panel off to the side rather than anchored to the marker (as the old
+   popup was), this is the only thing tying the two together on the map
+   itself. */
+.rhm-marker__inner--active .rhm-marker__pin {
+  transform: scale(1.25);
+  filter: drop-shadow(0 0 0 #fff) drop-shadow(0 3px 6px rgba(0, 0, 0, 0.5));
+}
+
+.rhm-marker__inner--active .rhm-marker__label {
+  background: #ffc93c;
+  color: #33484a;
+  /* Beats the collision logic's inline visibility:hidden, so the
+     selected hub always stays labelled even where labels are crowded. */
+  visibility: visible !important;
+}
+
 /* Positioned relative to .rhm-marker__inner. Visibility is toggled by
    the label-collision logic in map.js; kept as visibility rather than
    display so getBoundingClientRect() stays accurate while hidden. */
@@ -248,69 +455,64 @@
   pointer-events: none;
 }
 
-.maplibregl-popup-content {
-  border-radius: 10px;
-  padding: 0;
-  overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+/* The hub card itself — the contents of the detail panel's scrolling
+   body. Sized by the panel around it rather than carrying its own
+   width, so the same markup works in the desktop side panel and the
+   mobile bottom sheet. */
+.rhm-card {
+  padding: 16px 18px 22px;
 }
 
-.rhm-popup {
-  padding: 14px 16px 16px;
-  width: 340px;
-}
-
-.rhm-popup__photo {
+/* Bleeds edge-to-edge past .rhm-card's own padding, so a hub with a
+   photo gets a full-bleed header image butted straight up under the
+   panel header — the negative top margin cancels the padding a hub
+   without one needs above its title. */
+.rhm-card__photo {
   display: block;
-  width: 100%;
-  height: 170px;
+  height: 190px;
   object-fit: cover;
-  margin: -14px -16px 10px;
-  width: calc(100% + 32px);
+  margin: -16px -18px 14px;
+  width: calc(100% + 36px);
   max-width: none;
 }
 
-.rhm-popup__title {
-  margin: 0 0 6px;
-  font-size: 16px;
+.rhm-card__title {
+  margin: 0 0 10px;
+  font-size: 19px;
+  line-height: 1.25;
   color: #33484a;
 }
 
-/* Scrolls internally rather than growing the popup to fit every column
-   in the sheet — a hub with most columns filled in can easily have 15+
-   rows, taller than the map itself on a small screen. */
-.rhm-popup__specs {
+.rhm-card__specs {
   border-top: 1px solid #e5eae9;
-  padding-top: 8px;
+  padding-top: 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  max-height: 360px;
-  overflow-y: auto;
+  gap: 10px;
 }
 
-.rhm-popup__spec-row {
+.rhm-card__spec-row {
   display: flex;
   align-items: baseline;
-  gap: 10px;
-  font-size: 11px;
+  gap: 12px;
+  font-size: 12px;
 }
 
-.rhm-popup__spec-label {
+.rhm-card__spec-label {
   color: #7c8b8d;
-  flex: 0 0 96px;
+  flex: 0 0 112px;
 }
 
-.rhm-popup__spec-value {
+.rhm-card__spec-value {
   color: #33484a;
   font-weight: 600;
   flex: 1;
   min-width: 0;
+  line-height: 1.45;
   word-break: break-word;
 }
 
-.rhm-popup__spec-link {
+.rhm-card__spec-link {
   color: #1f7a5c;
   font-weight: 600;
   text-decoration: none;
@@ -318,7 +520,7 @@
   min-width: 0;
 }
 
-.rhm-popup__spec-link:hover {
+.rhm-card__spec-link:hover {
   text-decoration: underline;
 }
 
