@@ -239,10 +239,18 @@ sibling).
   (`.rhm-marker`, `.rhm-popup*`, `.rhm-pill*` classes) — in `map.css`
   for `embed.html`/`index.html`, or the inlined `<style>` block for
   `webflow-embed.html`.
-- **Scroll-zoom gesture lock** — `cooperativeGestures: false` in the
-  init call restores plain scroll-to-zoom instead of requiring Ctrl/⌘.
-- **List shown by default** — `showListByDefault: false` starts with the
-  list hidden and the "Show hub list" button visible instead.
+- **Scroll-zoom gesture lock** — off by default (plain scroll-to-zoom).
+  Set `cooperativeGestures: true` in the init call to require holding
+  Ctrl/⌘ to zoom instead, so scrolling past the map on a longer page
+  doesn't hijack the scroll.
+- **List shown by default** — separately configurable for desktop
+  (`showListByDefault`, default `true`) and mobile
+  (`showListByDefaultOnMobile`, default `false`). Mobile defaults closed
+  because the list overlays *on top of* the map there (see below) — an
+  open-by-default list would otherwise be the first thing a mobile
+  visitor sees instead of the map itself. Checked once at load time
+  based on the visitor's actual screen width, not re-checked if they
+  resize the window mid-session.
 - **Initial center/zoom** — `INITIAL_CENTER` / `INITIAL_ZOOM` near the
   top of the script, currently set to Queenstown Lakes district (where
   every hub in the sheet currently is), so the map opens already zoomed

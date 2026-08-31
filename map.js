@@ -608,13 +608,19 @@
         // See README.md for how to get this from File > Share >
         // Publish to web in Google Sheets.
         sheetCsvUrl: "",
-        // Requires holding Ctrl/⌘ to scroll-zoom, so scrolling the page
-        // past the map doesn't hijack the scroll. Set false to restore
-        // plain scroll-to-zoom.
-        cooperativeGestures: true,
-        // Whether the hub list sidebar starts open. Set false to start
-        // with it hidden and only the "Show hub list" button visible.
-        showListByDefault: true
+        // Set true to require holding Ctrl/⌘ to scroll-zoom, so
+        // scrolling the page past the map doesn't hijack the scroll.
+        // Off by default — plain scroll-to-zoom.
+        cooperativeGestures: false,
+        // Whether the hub list sidebar starts open, on desktop
+        // (`>=768px`). Set false to start with it hidden and only the
+        // "Show hub list" button visible.
+        showListByDefault: true,
+        // Same, but for mobile (`<768px`) specifically — kept separate
+        // from showListByDefault because an open-by-default list makes
+        // sense on desktop (plenty of room beside the map) but eats the
+        // whole map on a phone screen the moment the page loads.
+        showListByDefaultOnMobile: false
       },
       options || {}
     );
@@ -794,9 +800,15 @@
       animateMapResize(map, 260);
     }
 
-    // Set directly (no animation) for the starting state.
-    layout.sidebar.classList.toggle("is-hidden", !opts.showListByDefault);
-    showListControl.element.style.display = opts.showListByDefault ? "none" : "";
+    // Set directly (no animation) for the starting state. Checked at
+    // init time only (not kept in sync on resize) — deliberately: this
+    // is about what the visitor sees on first paint for whichever
+    // device they're on, not a layout rule that should flip the list
+    // open/closed mid-session just because they resized the window.
+    var startsOnMobile = window.matchMedia("(max-width: 767px)").matches;
+    var startVisible = startsOnMobile ? opts.showListByDefaultOnMobile : opts.showListByDefault;
+    layout.sidebar.classList.toggle("is-hidden", !startVisible);
+    showListControl.element.style.display = startVisible ? "none" : "";
 
     layout.closeBtn.addEventListener("click", function () {
       setSidebarVisible(false);

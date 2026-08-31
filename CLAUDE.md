@@ -51,12 +51,18 @@ own) — worth checking there before re-solving something already solved.
   ```js
       initResilienceHubsMap({
         sheetCsvUrl: "<the published CSV URL — see README>",
-        cooperativeGestures: true,
-        showListByDefault: true
+        cooperativeGestures: false,
+        showListByDefault: true,
+        showListByDefaultOnMobile: false
       });
     })();
   </script>
   ```
+
+  (Keep this block's option values in sync with whatever `map.js`'s own
+  `opts` defaults currently are — this is just an explicit copy of them
+  for `webflow-embed.html`'s init call, not an independent source of
+  truth.)
 
   i.e. the IIFE closes around a **direct call** to
   `initResilienceHubsMap(...)` instead of exporting it to `window` (map.js's
