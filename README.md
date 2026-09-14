@@ -73,9 +73,15 @@ to configure: add a column, rename one, reorder them, delete one you
 don't need anymore — the detail view just follows. This is how the
 current sheet's `Description`, `Address primary`, `Email`, `Facebook`,
 `WhatsApp`, `Website`, `Radio`, `Brochure`, `Resilience Guide`,
-`Generator`, `Solar`, `Battery`, `V2G`, `Backup circuits`, `Generator
-tank size`, `Space heating type`, and `Water heating type` columns all
-ended up there without any code changes.
+`Generator`, `Solar`, `Battery`, `Vehicle-To-Grid`, `Backup circuits`,
+`Generator tank size`, `Space heating type`, and `Water heating type`
+columns all ended up there without any code changes.
+
+Because the column header *is* the label, spell headers out the way a
+visitor should read them — this is why the `V2G` column was renamed to
+`Vehicle-To-Grid`. Jargon and abbreviations that make sense to whoever
+maintains the sheet reach the public map verbatim; there is no
+abbreviation-expansion step in the code, by design.
 
 Each value gets one of three treatments, decided automatically from
 what's actually in the cell:
