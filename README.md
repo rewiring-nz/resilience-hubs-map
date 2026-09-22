@@ -175,17 +175,23 @@ each tab gets its own CSV URL under this publishing flow.
 - Search matches on hub name (diacritic-insensitive).
 - A **"Find closest hub"** button sits directly under the search box.
   Clicking it asks the browser for the visitor's current location (the
-  usual browser permission prompt), then flies to and selects whichever
-  hub is nearest — straight-line distance, not driving distance. Button
-  text becomes "Locating…" while waiting, then briefly shows what went
-  wrong if it can't answer, before reverting after a few seconds:
-  "Location permission denied" (the visitor declined the prompt),
-  "Location blocked on this page" (see below), "Location timed out", or
-  "Location unavailable". This button doesn't render at all if the
-  browser has no Geolocation API (very old browsers, or loading the
-  page over plain `http://` on anything other than `localhost` —
-  geolocation requires a secure context), or if the page it's embedded
-  on has blocked geolocation outright.
+  usual browser permission prompt), then selects whichever hub is
+  nearest — straight-line distance, not driving distance — and frames
+  the map so that hub and the visitor's own position are both in view
+  at once. A small blue pin labelled **"You are here"** marks that
+  position, so the answer reads as "you're *there*, the nearest hub is
+  *here*" rather than just jumping to a hub. The pin stays on the map
+  afterwards (pan and zoom around it freely), and pressing the button
+  again moves it rather than leaving a trail of old pins. Button text
+  becomes "Locating…" while waiting, then briefly shows what went wrong
+  if it can't answer, before reverting after a few seconds: "Location
+  permission denied" (the visitor declined the prompt), "Location
+  blocked on this page" (see below), "Location timed out", or "Location
+  unavailable". This button doesn't render at all if the browser has no
+  Geolocation API (very old browsers, or loading the page over plain
+  `http://` on anything other than `localhost` — geolocation requires a
+  secure context), or if the page it's embedded on has blocked
+  geolocation outright.
 
   **"Location blocked on this page"** — or, on an older copy of this
   map, "Location permission denied" without any permission prompt ever

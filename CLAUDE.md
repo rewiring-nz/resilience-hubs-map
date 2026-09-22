@@ -229,23 +229,95 @@ this scale, not fine if this dataset ever grows to cover terrain where
 straight-line and driving distance diverge a lot (e.g. across a harbor
 or mountain range with one road around it).
 
-**If a user reports "Find closest hub" always fails with "Location
-permission denied," check the embed method before assuming it's a code
-bug.** Browsers block `navigator.geolocation` inside a cross-origin
-iframe by default — `embed.html` (Option A in README) only gets
-permission if the *host page's* `<iframe>` tag has
-`allow="geolocation"`. Without it, `getCurrentPosition`'s error
-callback fires immediately with `PERMISSION_DENIED`, and — this is the
-easy-to-miss part — **the browser's actual permission prompt never
-appears at all**, so it looks exactly like the visitor clicked "deny"
-even though they were never asked. There is no way to distinguish this
-case from a real user denial in JS (`err.code` is `PERMISSION_DENIED`
-either way) — the fix is entirely on the embedding side (add the `allow`
-attribute to the iframe, not a page-content-level check-and-adjust done
-inside this codebase), so don't go looking for a code-side detection of
-"blocked by iframe policy" — it doesn't exist and isn't buildable.
-Option B (inline paste) doesn't have this problem at all, since there's
-no iframe boundary for the permission to cross.
+**If a user reports "Find closest hub" failing, check the embed method
+before assuming it's a code bug.** Browsers block
+`navigator.geolocation` inside a cross-origin iframe by default —
+`embed.html` (Option A in README) only gets permission if the *host
+page's* `<iframe>` tag has `allow="geolocation"`. Without it,
+`getCurrentPosition`'s error callback fires immediately with
+`PERMISSION_DENIED`, and — this is the easy-to-miss part — **the
+browser's actual permission prompt never appears at all**, so it looks
+exactly like the visitor clicked "deny" even though they were never
+asked. Option B (inline paste) doesn't have this problem, since
+there's no iframe boundary for the permission to cross.
+
+**Correction to an earlier version of this note, which said that case
+was indistinguishable from a real denial in JS and "isn't
+buildable":** it is distinguishable, and the code now does it, two
+ways. Up front, `geolocationBlockedByPolicy()` asks the browser
+directly (`document.permissionsPolicy` / Chromium's
+`document.featurePolicy` → `allowsFeature("geolocation")`), and the
+call site skips rendering the button entirely when that says no.
+After the fact, `isPolicyBlockedError()` sniffs `err.message` for a
+policy mention, because Safari and Firefox expose no policy object to
+ask — and a genuine user denial never mentions a policy in its
+message. Verified in Chromium against a real cross-origin frame:
+without the attribute, `allowsFeature("geolocation")` is `false` and
+the error reads "Geolocation has been disabled in this document by
+permissions policy", *even when the site permission is already
+granted*; with the attribute, the position resolves.
+
+**Don't read "Location unavailable" or "Location timed out" as the
+same problem.** Those are `POSITION_UNAVAILABLE` / `TIMEOUT` — the
+page was allowed to ask and the visitor didn't refuse, but the device
+produced no fix. That is device-side (OS location services off for the
+browser, a desktop with no GPS and no usable wifi positioning, a VPN
+or extension blocking the lookup) and no amount of embedding or
+iframe-attribute work changes it. The button retries once with
+`enableHighAccuracy: true` and a longer timeout before reporting
+either, and always logs the browser's own `err.code` and `err.message`
+to the console — ask for that line first, it identifies the case
+immediately.
+
+**The button drops a "You are here" pin (`createYouAreHereEl`) and
+frames the result with `focusClosestHub()`, deliberately NOT the
+shared `focusEntry()`** that the search box and sidebar list use.
+`focusEntry` flies to the hub alone at `zoom >= 12`, which routinely
+leaves the visitor's own pin off-screen — half the answer missing.
+`focusClosestHub` fits both points instead. Two non-obvious parts:
+
+- *It waits ~300ms before fitting.* Selecting a hub opens the detail
+  panel, which animates the map's own size for 260ms
+  (`setSidebarVisible` → `animateMapResize`). `fitBounds` solves for
+  the canvas size it is handed at call time, so fitting before that
+  settles solves for the wrong viewport — on desktop the panel claims
+  340px of it, easily enough to push a pin off the edge.
+- *`panelBottomOverlapPx()` is measured, not hardcoded.* On mobile the
+  panel is absolutely positioned over the bottom of the map and must
+  be kept clear by padding; on desktop it's a flex sibling beside the
+  map, the boxes don't intersect, and the same function returns 0. The
+  mobile panel's height is a percentage of a container whose height
+  the embedder controls, so there's no constant to hardcode.
+
+`maxZoom` is a deliberately high 17: when the visitor is close to the
+hub, what separates the two pins on screen is zoom, so the right
+answer is to zoom in hard rather than hold a comfortable-looking zoom.
+
+The pin marker is held in `createFindClosestControl`'s own closure and
+moved with `setLngLat()` on later presses, so repeat presses can't
+stack duplicates. Note `maximumAge: 300000` means a second press
+within 5 minutes reuses the cached fix, so the pin legitimately won't
+move even if the device has physically moved — that's the cache, not a
+bug. The pin gets `pointerEvents = "none"` set inline (per element,
+not as a rule on MapLibre's own marker selector — see the
+`.rhm-marker` warning above) so it can't swallow a click meant for a
+hub pin underneath it.
+
+**Testing this offline:** the sandbox can't reach `unpkg.com`,
+`docs.google.com`, `server.arcgisonline.com`, or the live qea.nz page,
+but `registry.npmjs.org` works. So: `npm install maplibre-gl@5` (v6 is
+ESM-only and won't load via a plain `<script src>`), serve
+`map.js`/`map.css` plus a small fixture CSV over
+`python3 -m http.server`, and drive it with Playwright against
+`/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. One gotcha worth
+knowing: **`map.on("load")` never fires while a raster source has no
+loaded tiles**, so blocked Esri tiles look exactly like the "load
+never fires" flakiness described under Testing notes below. Stub them
+(`page.route('**/server.arcgisonline.com/**', ...)` with any 256×256
+PNG) and everything renders. Playwright's `context.setGeolocation()`
+does not invalidate the browser's own position cache, so `maximumAge`
+will serve the first fix to later presses in the same context — use a
+fresh context per location.
 
 ## Data source
 

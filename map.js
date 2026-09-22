@@ -238,6 +238,33 @@
     return el;
   }
 
+  // The visitor's own position, dropped by "Find closest hub". Blue and
+  // a size down from the yellow hub pins so it reads as "you", not as
+  // another hub, and its label sits above the pin rather than to the
+  // right (where hub names go) so the two stay distinguishable even
+  // when someone is standing right next to a hub.
+  function createYouAreHereEl() {
+    var el = document.createElement("div");
+    el.className = "rhm-here";
+    // Same hard rule as .rhm-marker: this is MapLibre's own element, so
+    // it gets no CSS of ours (see createMarkerEl's comment). The one
+    // exception is this inline pointer-events, which is per-element
+    // rather than a rule on the shared selector and doesn't touch
+    // layout: it lets a click land on a hub pin underneath instead of
+    // being swallowed by this marker's box, since this marker has
+    // nothing to click on anyway.
+    el.style.pointerEvents = "none";
+    el.innerHTML =
+      '<div class="rhm-here__inner">' +
+      '<span class="rhm-here__label">You are here</span>' +
+      '<svg class="rhm-here__pin" width="22" height="30" viewBox="0 0 28 38" xmlns="http://www.w3.org/2000/svg">' +
+      '<path d="M14 0C6.268 0 0 6.268 0 14c0 10.5 14 24 14 24s14-13.5 14-24C28 6.268 21.732 0 14 0z" fill="#3b82f6" stroke="#33484a" stroke-width="2"/>' +
+      '<circle cx="14" cy="14" r="4.5" fill="#fff"/>' +
+      "</svg>" +
+      "</div>";
+    return el;
+  }
+
   // Flies to an entry's marker and selects it (via onSelect, which
   // shows its detail panel — see showHubDetail() in renderHubs()).
   // Shared by the search box, "Find closest hub", and the sidebar list
@@ -254,6 +281,70 @@
     if (scrollToMap) {
       map.getContainer().scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
+  }
+
+  // How much of the map the detail panel is lying on top of. On mobile
+  // the panel is absolutely positioned over the bottom of the map; on
+  // desktop it sits beside it as a flex sibling, so the two boxes don't
+  // intersect at all and this comes out as 0. Measured rather than
+  // hardcoded, because the mobile panel's height is a percentage of a
+  // container whose own height the embedder controls.
+  function panelBottomOverlapPx(map) {
+    var mapEl = map.getContainer();
+    var layoutEl = mapEl.parentNode;
+    var panel = layoutEl && layoutEl.querySelector(".rhm-sidebar");
+    if (!panel) return 0;
+    var pr = panel.getBoundingClientRect();
+    var mr = mapEl.getBoundingClientRect();
+    if (!pr.width || !pr.height) return 0;
+    if (Math.min(mr.right, pr.right) - Math.max(mr.left, pr.left) <= 0) return 0;
+    var overlap = Math.min(mr.bottom, pr.bottom) - Math.max(mr.top, pr.top);
+    return Math.max(0, Math.min(overlap, mr.height));
+  }
+
+  // "Find closest hub" needs different framing from the search box and
+  // the sidebar list, which all just fly to the hub (focusEntry above).
+  // Flying to the hub alone routinely leaves the visitor's own "You are
+  // here" pin off-screen, which is half of the answer missing — so fit
+  // both points into view instead.
+  function focusClosestHub(map, entry, hereLngLat, onSelect) {
+    if (onSelect) onSelect(entry);
+
+    // Opening the detail panel animates the map's own size for 260ms
+    // (setSidebarVisible -> animateMapResize). fitBounds solves for the
+    // canvas size it is handed, so fitting before that settles solves
+    // for the wrong viewport — on desktop the panel claims 340px of it,
+    // easily enough to push a pin off the edge. Wait it out.
+    setTimeout(function () {
+      var canvas = map.getCanvas();
+      var w = canvas.clientWidth;
+      var h = canvas.clientHeight;
+      var bounds = new maplibregl.LngLatBounds(hereLngLat, hereLngLat).extend(
+        entry.feature.geometry.coordinates
+      );
+      var pad = 40;
+      var bottom = pad + panelBottomOverlapPx(map);
+
+      // fitBounds throws outright if the padding leaves no box to fit
+      // into, so on a map too small to hold it, fall back to a token
+      // padding rather than trying to be clever about a viewport with
+      // no room in it.
+      if (pad * 2 >= w - 40 || pad + bottom >= h - 40) {
+        map.fitBounds(bounds, { padding: 10, maxZoom: 17, duration: 900 });
+        return;
+      }
+
+      map.fitBounds(bounds, {
+        padding: { top: pad, bottom: bottom, left: pad, right: pad },
+        // Deliberately high: when the visitor is close to the hub, what
+        // separates the two pins on screen is zoom, so the right answer
+        // is to zoom in hard rather than hold a comfortable-looking
+        // zoom. Someone on the hub's doorstep genuinely should end up
+        // at street level looking at two distinct pins.
+        maxZoom: 17,
+        duration: 900
+      });
+    }, 300);
   }
 
   // ---- Name-label collision handling -------------------------------
@@ -479,42 +570,94 @@
     var defaultLabel = "Find closest hub";
     button.textContent = defaultLabel;
 
+    // Kept across clicks and moved rather than re-created, so repeated
+    // clicks can't stack up several "You are here" pins on the map.
+    var hereMarker = null;
+
+    // The fast attempt. High accuracy (a GPS lock) isn't needed just to
+    // tell which hub is nearest — hubs are km apart — and skipping it
+    // means a quicker network/wifi-based answer. maximumAge lets a
+    // second press reuse a recent fix instead of waking the device's
+    // hardware again.
+    var FAST = { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 };
+    // The fallback, tried once when the fast one reports no position
+    // rather than a refusal. A device with no usable wifi positioning
+    // (most desktops, a phone with wifi off) can still have a GPS that
+    // answers, so this is a genuinely different question, not the same
+    // one asked louder — hence a fresh fix (maximumAge: 0) and a longer
+    // budget, since a cold GPS lock takes a while.
+    var PRECISE = { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 };
+
+    function onPosition(pos) {
+      button.disabled = false;
+      button.textContent = defaultLabel;
+      var here = [pos.coords.longitude, pos.coords.latitude];
+      if (hereMarker) {
+        hereMarker.setLngLat(here);
+      } else {
+        hereMarker = new maplibregl.Marker({ element: createYouAreHereEl(), anchor: "bottom" })
+          .setLngLat(here)
+          .addTo(map);
+      }
+      var closest = closestEntry(entries, pos.coords.latitude, pos.coords.longitude);
+      if (closest) focusClosestHub(map, closest, here, onSelect);
+    }
+
+    function onFailure(err) {
+      button.disabled = false;
+      button.textContent = geolocationErrorLabel(err);
+      // Always logged, with the browser's own code and wording: these
+      // failures are reported by a three-word button label on someone
+      // else's device, and this line is the only thing that says which
+      // of them actually happened.
+      console.warn(
+        "[resilience-hubs-map] Geolocation failed — code " +
+          err.code +
+          " (" +
+          (err.message || "no message") +
+          ")."
+      );
+      if (isPolicyBlockedError(err)) {
+        // Nothing the visitor can do about this one — it's the
+        // embedding page's <iframe> tag that needs changing, so say so
+        // where whoever embedded it will see it.
+        console.warn(
+          "[resilience-hubs-map] Geolocation is blocked by this page's permissions " +
+            "policy, so the visitor was never prompted. If this map is in an <iframe>, " +
+            'add allow="geolocation" to that <iframe> tag on the host page.'
+        );
+      } else if (err.code !== err.PERMISSION_DENIED) {
+        // Worth spelling out, because "Location unavailable" reads like
+        // a bug in the map and isn't one.
+        console.warn(
+          "[resilience-hubs-map] The page was allowed to ask and the request wasn't " +
+            "refused — the device simply returned no position. Usual causes: location " +
+            "services switched off for this browser at the OS level, a device with no " +
+            "GPS and no usable wifi positioning, or a VPN/privacy extension blocking " +
+            "the lookup. Nothing in the map or its embed code can fix those."
+        );
+      }
+      setTimeout(function () {
+        button.textContent = defaultLabel;
+      }, 3000);
+    }
+
     button.addEventListener("click", function () {
       if (!entries.length) return;
       button.disabled = true;
       button.textContent = "Locating…";
 
-      navigator.geolocation.getCurrentPosition(
-        function (pos) {
-          button.disabled = false;
-          button.textContent = defaultLabel;
-          var closest = closestEntry(entries, pos.coords.latitude, pos.coords.longitude);
-          if (closest) focusEntry(map, closest, false, onSelect);
-        },
-        function (err) {
-          button.disabled = false;
-          button.textContent = geolocationErrorLabel(err);
-          if (isPolicyBlockedError(err)) {
-            // Nothing the visitor can do about this one — it's the
-            // embedding page's <iframe> tag that needs changing, so
-            // say so where whoever embedded it will see it.
-            console.warn(
-              "[resilience-hubs-map] Geolocation is blocked by this page's permissions " +
-                "policy, so the visitor was never prompted. If this map is in an <iframe>, " +
-                'add allow="geolocation" to that <iframe> tag on the host page.'
-            );
-          }
-          setTimeout(function () {
-            button.textContent = defaultLabel;
-          }, 3000);
-        },
-        // High accuracy (GPS lock) isn't needed just to tell which hub
-        // is nearest — hubs are km apart — and skipping it means a
-        // faster (network/wifi-based) response instead of waiting on
-        // GPS. maximumAge lets a second click reuse a recent fix
-        // instead of re-prompting the device hardware every time.
-        { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
-      );
+      navigator.geolocation.getCurrentPosition(onPosition, function (err) {
+        // A refusal is final — asking again just re-prompts someone who
+        // already said no (or, for a policy block, can't be asked at
+        // all). Only "I couldn't get a position" is worth a second try.
+        if (err.code === err.PERMISSION_DENIED) {
+          onFailure(err);
+          return;
+        }
+        button.textContent = "Locating…";
+        navigator.geolocation.getCurrentPosition(onPosition, onFailure, PRECISE);
+      }, FAST);
     });
 
     container.appendChild(button);
@@ -525,6 +668,10 @@
       },
       onRemove: function () {
         if (container.parentNode) container.parentNode.removeChild(container);
+        if (hereMarker) {
+          hereMarker.remove();
+          hereMarker = null;
+        }
       }
     };
   }

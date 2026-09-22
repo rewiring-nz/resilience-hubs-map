@@ -299,6 +299,42 @@
   pointer-events: none;
 }
 
+/* The visitor's own position, dropped by the "Find closest hub" button
+   (see createYouAreHereEl). Same hard rule as .rhm-marker above:
+   .rhm-here is MapLibre's own element and carries none of our CSS —
+   all of it lives on the inner wrapper. */
+.rhm-here__inner {
+  position: relative;
+  line-height: 0;
+}
+
+.rhm-here__pin {
+  display: block;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
+}
+
+/* Deliberately above the pin, where hub names never go (those sit to
+   the right — see .rhm-marker__label), so this can't be misread as the
+   name of a hub the visitor happens to be standing next to. Not part
+   of the label-collision logic in map.js, which only tracks hub
+   labels: this one always shows, being the thing the visitor just
+   asked for. */
+.rhm-here__label {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #fff;
+  background: rgba(13, 20, 20, 0.72);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
 .rhm-detail__photo {
   display: block;
   width: 100%;
