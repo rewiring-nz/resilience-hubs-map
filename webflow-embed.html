@@ -913,20 +913,27 @@
         var bounds = new maplibregl.LngLatBounds(hereLngLat, hereLngLat).extend(
           entry.feature.geometry.coordinates
         );
-        var pad = 40;
+        // fitBounds pads the *coordinate*, but a marker is drawn above its
+        // coordinate: the "You are here" pin stands 30px tall anchored at
+        // its point, with the label another ~20px above that. Padding the
+        // point by the same amount all round therefore clips the label
+        // off the top edge — which is exactly the piece this button
+        // exists to show. Hence the asymmetric top.
+        var pad = 48;
+        var top = 64;
         var bottom = pad + panelBottomOverlapPx(map);
   
         // fitBounds throws outright if the padding leaves no box to fit
         // into, so on a map too small to hold it, fall back to a token
         // padding rather than trying to be clever about a viewport with
         // no room in it.
-        if (pad * 2 >= w - 40 || pad + bottom >= h - 40) {
+        if (pad * 2 >= w - 40 || top + bottom >= h - 40) {
           map.fitBounds(bounds, { padding: 10, maxZoom: 17, duration: 900 });
           return;
         }
   
         map.fitBounds(bounds, {
-          padding: { top: pad, bottom: bottom, left: pad, right: pad },
+          padding: { top: top, bottom: bottom, left: pad, right: pad },
           // Deliberately high: when the visitor is close to the hub, what
           // separates the two pins on screen is zoom, so the right answer
           // is to zoom in hard rather than hold a comfortable-looking
