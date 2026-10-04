@@ -135,6 +135,49 @@ value's rendering (colored pill for Yes/No/Unknown, clickable link for
 a URL or email, plain text otherwise) is decided per-value by
 `specRow()`/`linkifyValue()`, not per-column.
 
+**The one exception to that genericness is the Emergency Location
+block**, and it stays an exception on purpose. `hubDetailHTML()` pulls
+every field whose *column name* matches `LOCATION_FIELD_PATTERN`
+(`address|location|street|venue|premises|meeting point`, word-bounded)
+out of the ordinary rows and renders them together, above them, at
+15px instead of 12px. Two things make it different from a normal
+field:
+
+- *It renders even when empty*, as "Unknown" on a solid red badge.
+  Every other field disappears when blank (`specRow()` returns "" for
+  an empty value), which for a location silently reads as "nothing to
+  report here" rather than "nobody knows where this is" — the opposite
+  of the truth, on a map someone may be using in an emergency.
+- *It is matched by pattern, not by a list of column names*, which is
+  what keeps it compatible with the genericness rule above: the sheet
+  can grow an "Alternate Address" or a "Meeting Point" column and it
+  joins the block with no code change. When there's more than one
+  match, each value is captioned with its own column name so a primary
+  address is distinguishable from an alternate; with just one, the
+  caption is dropped as noise.
+
+The pattern is deliberately a bit wider than "address", because the
+asymmetry matters: a location column it *misses* makes the block
+announce "Unknown" while the real address sits in an ordinary row
+directly below it — confidently wrong, the worst failure available
+here. Absorbing one column too many is merely cosmetic. The `\b`
+anchors are load-bearing: without them "site" swallows a "Website"
+column. If you widen it, re-check it against non-location column names
+(Website, Contact, Site Manager, Backup Power) and not just the
+location ones.
+
+**Duplicate column names no longer silently eat each other.**
+`rowsToObjects()` suffixes repeats (`Address`, `Address` → `Address`,
+`Address (2)`) before building the row object. Previously the
+rightmost column of a repeated name overwrote the others, so a sheet
+carrying "Address" twice — one of them an alternate — lost the first
+one with no sign anything had gone missing. Blank headers are
+deliberately left as-is, because they're nearly always the empty
+trailing columns Google exports rather than real data; note the
+consequence, which is unfixed: two blank-headered columns still
+collide, and one blank-headered column carrying data still renders a
+row with an empty label.
+
 **Pill colors are solid fills, not the pale-tint style you'd expect on
 a white background.** `.rhm-pill--yes`/`--no`/`--unknown` used to sit
 inside a white MapLibre popup bubble and used dark text on a pale

@@ -77,6 +77,36 @@ current sheet's `Description`, `Address primary`, `Email`, `Facebook`,
 tank size`, `Space heating type`, and `Water heating type` columns all
 ended up there without any code changes.
 
+**Address and location columns are the one exception**, and they get
+promoted. Any column whose *name* contains `address`, `location`,
+`street`, `venue`, `premises` or `meeting point` is lifted out of that
+ordinary list and shown together in an **Emergency Location** block at
+the top of the detail view, in larger text. So `Address primary` and an
+`Address alternate` (or `Alternate address`, `Address 2`, `Meeting
+point` — whatever you call it) appear side by side as the first thing
+anyone reads, each captioned with its own column name so the primary
+is distinguishable from the alternate. Add another such column and it
+joins the block on its own; no code change needed, same as any other
+column.
+
+Unlike every other field, **this block is shown even when the sheet has
+nothing in it** — it then reads **Unknown** on a solid red badge. A
+blank address does not quietly vanish, because a missing row reads as
+"nothing to report here" when the truth is "nobody knows where this
+is". If you see a red Unknown on the map, that hub needs an address
+filling in.
+
+One caveat on naming: a location column whose name contains none of
+those words (say you called it `Where to go`) won't be recognised as a
+location, so it will show as an ordinary row *and* the block will say
+Unknown. If you add a location column, keep one of those words in its
+name — or tell whoever maintains this map and the list can be widened.
+
+Two columns with the **same** header are no longer a problem: the
+second one is shown as `Address (2)` rather than silently replacing the
+first. Give them distinct names if you can, though — the generated
+label is nobody's idea of a good one.
+
 Each value gets one of three treatments, decided automatically from
 what's actually in the cell:
 

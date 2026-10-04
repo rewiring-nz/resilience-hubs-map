@@ -79,8 +79,23 @@
   // shared sheet) still matches "Image1" everywhere else in this file.
   function rowsToObjects(rows) {
     if (!rows.length) return [];
+    var seen = Object.create(null);
     var headers = rows[0].map(function (h) {
-      return h.trim();
+      var name = h.trim();
+      // Two columns sharing a name used to collide in the row object,
+      // the rightmost silently overwriting the other — a real way for a
+      // column's data to vanish from the panel (a sheet carrying
+      // "Address" twice, one of them an alternate, loses the first).
+      // Suffix the repeats so both survive and both render. Blank
+      // headers are left alone: they're nearly always the empty
+      // trailing columns Google exports, not real data.
+      if (!name) return name;
+      if (seen[name]) {
+        seen[name] += 1;
+        return name + " (" + seen[name] + ")";
+      }
+      seen[name] = 1;
+      return name;
     });
     return rows.slice(1).map(function (r) {
       var obj = {};
@@ -199,6 +214,76 @@
   // Returns just the hub's own content (photo/title/specs) — the
   // caller drops this into the panel's already-styled, already-padded
   // container (.rhm-sidebar__detail-body), so no outer wrapper here.
+  // Columns describing where the hub physically is. Matched by pattern
+  // rather than a fixed list of names, for the same reason the rest of
+  // the detail view is generic (see SPECIAL_FIELDS): the sheet can grow
+  // an "Alternate Address" or a "Secondary Location" column without
+  // anyone touching this file. Matched columns are promoted into the
+  // Emergency Location block instead of rendering as ordinary field
+  // rows, so nothing appears twice — and a column this pattern misses
+  // still renders as an ordinary row, so an oddly-named one is merely
+  // ungrouped, never dropped.
+  // Word-bounded, and deliberately a little wider than just "address":
+  // the failure that matters is a real location column this pattern
+  // *misses*, because then the block announces "Unknown" while the
+  // actual address sits in an ordinary row directly beneath it — a
+  // confident lie, and the worst way to be wrong here. Absorbing one
+  // column too many is only cosmetic by comparison. The \b matters:
+  // without it "site" would swallow a "Website" column.
+  var LOCATION_FIELD_PATTERN = /\b(address|location|street|venue|premises|meeting\s*point)\b/i;
+
+  function isLocationField(key) {
+    return LOCATION_FIELD_PATTERN.test(key);
+  }
+
+  // Unlike every other field, this one is rendered even when the sheet
+  // has nothing to put in it. The generic row rendering drops an empty
+  // value entirely (see specRow), which for a location reads as "no
+  // problem here" rather than "nobody knows where this is" — the
+  // opposite of the truth, and the worst possible way to be wrong on a
+  // map someone is using in an emergency. So: always present, stated
+  // plainly as Unknown, in red.
+  function locationBlockHTML(fields) {
+    var items = [];
+    Object.keys(fields).forEach(function (key) {
+      if (!isLocationField(key)) return;
+      var v = (fields[key] || "").trim();
+      if (v) items.push({ label: key, value: v });
+    });
+
+    var body;
+    if (!items.length) {
+      body = '<span class="rhm-detail__location-unknown">Unknown</span>';
+    } else {
+      body = items
+        .map(function (item) {
+          // The column's own name only earns its place when there's
+          // more than one of them — with a single address, a caption
+          // reading "Address" under a heading that already says
+          // Emergency Location is pure noise.
+          var caption =
+            items.length > 1
+              ? '<span class="rhm-detail__location-caption">' + escapeHTML(item.label) + "</span>"
+              : "";
+          return (
+            '<div class="rhm-detail__location-item">' +
+            caption +
+            (linkifyValue(item.value) ||
+              '<span class="rhm-detail__location-value">' + escapeHTML(item.value) + "</span>") +
+            "</div>"
+          );
+        })
+        .join("");
+    }
+
+    return (
+      '<div class="rhm-detail__location">' +
+      '<span class="rhm-detail__location-label">Emergency Location</span>' +
+      body +
+      "</div>"
+    );
+  }
+
   function hubDetailHTML(props) {
     var photo = props.image1
       ? '<img class="rhm-detail__photo" src="' + escapeHTML(props.image1) + '" alt="">'
@@ -206,12 +291,15 @@
 
     var specs = "";
     Object.keys(props.fields).forEach(function (key) {
+      // Location columns are shown in the block above instead.
+      if (isLocationField(key)) return;
       specs += specRow(key, props.fields[key]);
     });
 
     return (
       photo +
       '<h3 class="rhm-detail__title">' + escapeHTML(props.name) + "</h3>" +
+      locationBlockHTML(props.fields) +
       (specs ? '<div class="rhm-detail__specs">' + specs + "</div>" : "")
     );
   }

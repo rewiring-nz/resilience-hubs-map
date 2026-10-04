@@ -350,6 +350,74 @@
   color: #fff;
 }
 
+/* Always rendered, unlike the generic spec rows below, and deliberately
+   larger than them. In an emergency "where is this place" is the one
+   field someone needs at a glance, and a hub with no location on record
+   has to say so out loud rather than quietly leave the row out the way
+   an empty generic field does. */
+.rhm-detail__location {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rhm-detail__location-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.rhm-detail__location-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Only rendered when a hub has more than one location column, to tell a
+   primary address apart from an alternate one. */
+.rhm-detail__location-caption {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* The second selector covers a location column holding a URL or email
+   (a maps link, say), which linkifyValue renders as a spec link —
+   without this it would come out at the ordinary 12px row size and
+   look like it belongs to a different block. */
+.rhm-detail__location-value,
+.rhm-detail__location .rhm-detail__spec-link {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #fff;
+  word-break: break-word;
+}
+
+.rhm-detail__location .rhm-detail__spec-link {
+  color: #ffc93c;
+}
+
+/* Solid red, not the pale translucent --unknown pill the ordinary
+   fields use: this one is a warning, not a neutral "not recorded". Sized
+   to match the real location values it stands in for, so it reads as the
+   answer to the same question rather than as a footnote. */
+.rhm-detail__location-unknown {
+  align-self: flex-start;
+  padding: 3px 10px;
+  border-radius: 4px;
+  background: #c0392b;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
 /* No max-height/scroll of its own — .rhm-sidebar__detail (the whole
    panel content, photo/title/specs together) is what scrolls now that
    this lives in a persistent side panel rather than a small popup
