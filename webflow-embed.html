@@ -63,12 +63,22 @@
     border-radius: 12px 0 0 12px;
   }
   
+  /* Translucent black rather than a solid fill. Note what's actually
+     behind it differs by breakpoint: on mobile the panel overlays the map,
+     so the imagery shows through; on desktop it's a flex sibling beside
+     the map, so what shows through is the host page behind the embed. The
+     backdrop blur is what keeps white text readable over busy satellite
+     imagery on mobile — without it, a bright snowy tile under 0.7 black
+     still eats the lower-contrast text. Browsers without backdrop-filter
+     fall back to the flat 0.7 black, which is legible, just busier. */
   .rhm-sidebar {
     width: 340px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    background: #527570;
+    background: rgba(0, 0, 0, 0.7);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
     border-radius: 0 12px 12px 0;
     overflow: hidden;
     transition: width 0.25s ease, opacity 0.2s ease;
@@ -167,7 +177,14 @@
     text-align: left;
     padding: 10px 14px;
     border: none;
-    background: #527570;
+    /* Its own background composites on top of the panel's rather than
+       replacing it, so this can't be the panel colour exactly — it has to
+       be opaque enough to hide the detail content scrolling underneath,
+       which inevitably makes the strip darker than the panel. Leaned into
+       rather than fought: a lower alpha plus a hairline underneath reads
+       as a deliberate sticky header instead of a seam. */
+    background: rgba(0, 0, 0, 0.55);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     color: rgba(255, 255, 255, 0.85);
     font: inherit;
     font-size: 12px;
@@ -316,7 +333,7 @@
     font-size: 11px;
     font-weight: 600;
     color: #fff;
-    background: rgba(13, 20, 20, 0.62);
+    background: rgba(0, 0, 0, 0.62);
     padding: 2px 6px;
     border-radius: 4px;
     pointer-events: none;
@@ -353,7 +370,7 @@
     font-weight: 600;
     line-height: 1.4;
     color: #fff;
-    background: rgba(13, 20, 20, 0.72);
+    background: rgba(0, 0, 0, 0.72);
     padding: 1px 5px;
     border-radius: 3px;
   }
@@ -382,7 +399,11 @@
     margin: 0 0 10px;
     padding: 10px 12px;
     border-radius: 8px;
-    background: rgba(0, 0, 0, 0.18);
+    /* A white veil, not the black one this used while the panel was green:
+       darkening a panel that is already near-black just makes the card
+       disappear. */
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.14);
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -497,8 +518,12 @@
   }
   
   /* Solid fills with white text, not the tinted/text-colored style you'd
-     use on a white background — these now sit on the sidebar's own green
-     background (#527570), where a pale tint would barely register. */
+     use on a white background — these sit on the sidebar's own dark
+     translucent panel, where a pale tint would barely register. The hues
+     are unchanged from when that panel was green: white-on-fill contrast
+     is a property of the pill, not of what's behind it, and keeping --no
+     muted leaves the brighter red of .rhm-detail__location-unknown free to
+     read as an alert rather than as just another data value. */
   .rhm-pill--yes {
     background: #2f8f66;
     color: #fff;
@@ -526,7 +551,7 @@
     padding: 7px 10px;
     border: none;
     border-radius: 4px;
-    background: rgba(13, 20, 20, 0.55);
+    background: rgba(0, 0, 0, 0.55);
     color: #fff;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
     outline: none;
@@ -537,8 +562,8 @@
   }
   
   .rhm-search__input:focus {
-    background: rgba(13, 20, 20, 0.75);
-    box-shadow: 0 0 0 2px #1f7a5c;
+    background: rgba(0, 0, 0, 0.75);
+    box-shadow: 0 0 0 2px #ffc93c;
   }
   
   /* Stacks directly under .rhm-search — both are added as "top-left" map
@@ -557,14 +582,14 @@
     padding: 7px 12px;
     border: none;
     border-radius: 4px;
-    background: rgba(13, 20, 20, 0.55);
+    background: rgba(0, 0, 0, 0.55);
     color: #fff;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
     cursor: pointer;
   }
   
   .rhm-find-closest__button:hover {
-    background: rgba(13, 20, 20, 0.75);
+    background: rgba(0, 0, 0, 0.75);
   }
   
   .rhm-find-closest__button:disabled {
@@ -585,14 +610,14 @@
     padding: 7px 12px;
     border: none;
     border-radius: 4px;
-    background: rgba(13, 20, 20, 0.55);
+    background: rgba(0, 0, 0, 0.55);
     color: #fff;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
     cursor: pointer;
   }
   
   .rhm-show-list__button:hover {
-    background: rgba(13, 20, 20, 0.75);
+    background: rgba(0, 0, 0, 0.75);
   }
   
   .rhm-search__results {
@@ -626,7 +651,7 @@
   
   .rhm-search__result:hover,
   .rhm-search__result:focus {
-    background: #f4faf7;
+    background: #f1f1f1;
   }
   
   .rhm-search__result-name {
@@ -647,7 +672,7 @@
     text-align: center;
     padding: 12px 16px;
     border-radius: 8px;
-    background: rgba(13, 20, 20, 0.75);
+    background: rgba(0, 0, 0, 0.75);
     color: #fff;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 13px;

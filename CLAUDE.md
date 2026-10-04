@@ -178,15 +178,39 @@ consequence, which is unfixed: two blank-headered columns still
 collide, and one blank-headered column carrying data still renders a
 row with an empty label.
 
+**The panel is translucent black (`rgba(0, 0, 0, 0.7)`), and what's
+behind it differs by breakpoint.** On mobile it overlays the map, so
+satellite imagery shows through; on desktop it's a flex sibling beside
+the map, so what shows through is the *host page* behind the embed —
+white, in a default iframe. That second case is the legibility floor,
+not the first: 0.7 black over white composites to `rgb(76, 76, 76)`,
+against `rgb(38, 36, 30)` over typical imagery. Measured at that floor,
+white body text lands at 8.6:1 and the 0.65-alpha labels at 4.7:1, both
+clear of WCAG AA, so there's headroom if the alpha ever drops — but
+re-measure rather than eyeballing it, because a computed `rgba()` tells
+you nothing about what a reader actually sees through it.
+
+The `backdrop-filter: blur(10px)` is doing real work on mobile, where
+text sits over busy imagery; browsers without it fall back to flat 0.7
+black, which is legible, just busier. Note the panel's translucency is
+also why `.rhm-sidebar__back` can't simply reuse the panel colour: a
+child's background composites *on top of* its parent's, so matching
+alphas would make that sticky strip ~0.91 black against the panel's
+0.7. It's set lower (0.55) with a hairline border so the unavoidable
+band reads as a deliberate sticky header rather than a seam. There is
+no alpha value that makes it match — don't go hunting for one.
+
 **Pill colors are solid fills, not the pale-tint style you'd expect on
 a white background.** `.rhm-pill--yes`/`--no`/`--unknown` used to sit
 inside a white MapLibre popup bubble and used dark text on a pale
-tinted background; now that this content lives directly on the
-sidebar's own green (`#527570`) background, that same treatment would
-have terrible contrast, so these are solid color fills with white text
-instead. If you ever restyle the sidebar to a light background, these
-pill colors need revisiting too — they're tuned specifically for
-sitting on that green.
+tinted background; on the dark panel that treatment would have terrible
+contrast, so these are solid color fills with white text instead. The
+hues are unchanged from when the panel was green, deliberately:
+white-on-fill contrast is a property of the pill itself and doesn't
+move when the panel behind it does, and keeping `--no` muted leaves the
+brighter red of `.rhm-detail__location-unknown` free to read as an
+alert rather than as just another data value. If you ever restyle the
+panel to a *light* background, these do need revisiting.
 
 **CSV parsing is hand-rolled** (`parseCSV()`) rather than a naive
 `.split(",")`, because real sheet data has commas inside quoted cells
@@ -416,12 +440,31 @@ README.md is exhaustive or current — `curl` the sheet to check.
 ## Deployment
 
 GitHub Pages, `rewiring-nz` org, auto-deploys on push to `main` (no
-build step — static files served as-is). Poll build status after
-pushing:
+build step — static files served as-is).
+
+To poll the build after pushing, **use the Actions API, not the Pages
+API**. An earlier version of this file recommended
 
 ```bash
 gh api repos/rewiring-nz/resilience-hubs-map/pages/builds/latest --jq '.status'
 ```
+
+which does not work from a Claude Code session: `gh` there is a
+built-in shim routed through a proxy that refuses that path outright
+(`HTTP 403 — Access to this GitHub API path is not permitted through
+this proxy`). Retrying won't help. The deploy runs as a workflow named
+"pages build and deployment", so ask Actions about it instead — via
+the GitHub MCP tools (`actions_list` with `list_workflow_runs`, then
+`list_workflow_jobs` on the run id), or:
+
+```bash
+gh api repos/rewiring-nz/resilience-hubs-map/actions/runs --jq \
+  '.workflow_runs[0] | {status, conclusion, head_sha}'
+```
+
+The run has three jobs (`build`, `deploy`, `report-build-status`); the
+page is only actually live once `deploy` reports success, which is
+typically ~45-60s after the push.
 
 Live at https://rewiring-nz.github.io/resilience-hubs-map/ (demo page)
 and https://rewiring-nz.github.io/resilience-hubs-map/embed.html (bare,

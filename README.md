@@ -176,7 +176,7 @@ each tab gets its own CSV URL under this publishing flow.
 - See the column table above for how each value's treatment (pill,
   link, or plain text) is decided. Pills use solid fills (not the
   pale-tint style you'd see on a white background) since they sit on
-  the panel's own green background.
+  the panel's own dark background.
 
 ## Sidebar panel, search, mobile behavior
 
